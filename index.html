@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>基于数字孪生的建筑工地三维可视化管控系统</title>
+    <link rel="stylesheet" href="./src/style.css" />
+    <!--
+      用 Live Server 直接打开时必须靠 importmap 解析裸模块名，
+      把 three 与 three/addons/ 指向本地 node_modules。
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./node_modules/three/build/three.module.js",
+          "three/addons/": "./node_modules/three/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="viewport"></canvas>
+
+      <!-- 漫游准星 -->
+      <div id="crosshair" class="crosshair" hidden></div>
+
+      <!-- 顶部标题条（细） -->
+      <header class="hud hud-top">
+        <div class="brand">
+          <span class="brand-dot"></span>
+          <h1>建筑工地数字孪生可视化平台</h1>
+        </div>
+        <p id="hud-status">正在初始化…</p>
+      </header>
+
+      <!-- 顶部居中：风险告警条（有风险时出现） -->
+      <div id="risk-banner" class="risk-banner" hidden></div>
+
+      <!-- 右侧统一控制面板：按使用频率自上而下排列
+           时间环境 / 视角切换 / 塔吊 / 设备动画 / 大门 / 车辆灯光 / 风险模拟 / 场景对象 -->
+      <aside class="hud hud-panel" id="side-panel">
+        <!-- 面板操作：一键把整个应用状态恢复默认 -->
+        <div class="panel-actions">
+          <button type="button" id="btn-reset" class="reset-btn">恢复默认</button>
+        </div>
+
+        <!-- 1. 时间环境（4 个时刻预设 + 时钟 / 温度状态行） -->
+        <section class="panel-section">
+          <button type="button" class="section-head" data-section="time" aria-expanded="true">
+            <span class="section-head-label">时间环境</span>
+            <i class="chev" aria-hidden="true">▾</i>
+          </button>
+          <div class="section-body">
+            <div class="btn-grid" id="time-buttons"></div>
+            <p class="time-status" id="time-status">—</p>
+          </div>
+        </section>
+
+        <!-- 2. 视角切换 -->
+        <section class="panel-section">
+          <button type="button" class="section-head" data-section="views" aria-expanded="true">
+            <span class="section-head-label">视角切换</span>
+            <i class="chev" aria-hidden="true">▾</i>
+          </button>
+          <div class="section-body">
+            <div class="btn-grid" id="view-buttons"></div>
+            <div class="mode-row">
+              <button type="button" id="btn-orbit" class="mode-btn is-active">俯瞰</button>
+              <button type="button" id="btn-roam" class="mode-btn">漫游</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. 塔吊（回转 + 小车变幅 + 吊钩升降，三个动作各有速度倍率） -->
+        <section class="panel-section" id="crane-panel">
+          <button type="button" class="section-head" data-section="crane" aria-expanded="true">
+            <span class="section-head-label">塔吊</span>
+            <i class="chev" aria-hidden="true">▾</i>
+          </button>
+          <div class="section-body">
+            <div class="btn-grid single">
+              <button type="button" class="tool-btn" id="crane-slew" aria-pressed="false">塔吊回转：停</button>
+            </div>
+            <div class="crane-row">
+              <span class="crane-label">回转速度</span>
+              <input type="range" class="crane-range" id="crane-speed-slew" min="0.2" max="3" step="0.1" value="1" aria-label="回转速度倍率" />
+              <span class="crane-value" id="crane-speed-slew-value">1.0×</span>
+            </div>
+            <div class="crane-row">
+              <span class="crane-label">小车变幅</span>
+              <input type="range" class="crane-range" id="crane-trolley" min="2.5" max="41.9" step="0.1" value="21.6" aria-label="小车变幅（幅度 m）" />
+              <span class="crane-value" id="crane-trolley-value">21.6 m</span>
+            </div>
+            <div class="crane-row">
+              <span class="crane-label">变幅速度</span>
+              <input type="range" class="crane-range" id="crane-speed-trolley" min="0.2" max="3" step="0.1" value="1" aria-label="变幅速度倍率" />
+              <span class="crane-value" id="crane-speed-trolley-value">1.0×</span>
+            </div>
+            <div class="btn-grid single">
+              <button type="button" class="tool-btn" id="crane-trolley-auto" aria-pressed="false">小车变幅：自动</button>
+            </div>
+            <div class="crane-row">
+              <span class="crane-label">吊钩升降</span>
+              <input type="range" class="crane-range" id="crane-hoist" min="3" max="28" step="0.1" value="3" aria-label="吊钩升降（绳长 m）" />
+              <span class="crane-value" id="crane-hoist-value">3.0 m</span>
+            </div>
+            <div class="crane-row">
+              <span class="crane-label">升降速度</span>
+              <input type="range" class="crane-range" id="crane-speed-hoist" min="0.2" max="3" step="0.1" value="1" aria-label="升降速度倍率" />
+              <span class="crane-value" id="crane-speed-hoist-value">1.0×</span>
+            </div>
+            <div class="btn-grid single">
+              <button type="button" class="tool-btn" id="crane-auto" aria-pressed="false">吊钩升降：自动</button>
+            </div>
+            <p class="crane-status" id="crane-status">—</p>
+          </div>
+        </section>
+
+        <!-- 4. 设备动画（每台机械独立开关 + 独立速度，可多台同时动作） -->
+        <section class="panel-section" id="anim-panel">
+          <button type="button" class="section-head" data-section="machines" aria-expanded="true">
+            <span class="section-head-label">设备动画</span>
+            <i class="chev" aria-hidden="true">▾</i>
+          </button>
+          <div class="section-body">
+            <div class="anim-list" id="anim-buttons"></div>
+          </div>
+        </section>
+
+        <!-- 5. 大门（两扇蓝色门扇对开：开 / 关 + 开合速度） -->
+        <section class="panel-section" id="gate-panel">
+          <button type="button" class="section-head" data-section="gate" aria-expanded="true">
+            <span class="section-head-label">大门</span>
+            <i class="chev" aria-hidden="true">▾</i>
+          </button>
+          <div class="section-body">
+            <div class="btn-grid single">
+              <button type="button" class="tool-btn" id="gate-toggle" aria-pressed="false">大门：关闭</button>
+            </div>
+            <div class="crane-row">
+              <span class="crane-label">开合速度</span>
+              <input type="range" class="crane-range" id="gate-speed" min="0.2" max="3" step="0.1" value="1" aria-label="大门开合速度倍率" />
+              <span class="crane-value" id="gate-speed-value">1.0×</span>
+            </div>
+            <p class="crane-status" id="gate-status">—</p>
+          </div>
+        </section>
+
+        <!-- 6. 车辆灯光（作业车辆总开关） -->
+        <section class="panel-section">
+          <button type="button" class="section-head" data-section="vehicle" aria-expanded="true">
+            <span class="section-head-label">车辆灯光</span>
+            <i class="chev" aria-hidden="true">▾</i>
+          </button>
+          <div class="section-body">
+            <div class="btn-grid single">
+              <button type="button" class="tool-btn" id="btn-vehicle-lights" aria-pressed="false">车辆灯光：关</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 7. 人员（实时在场人数 / 分区分布 / 气温 / 风险状态；运行时按 worker.glb 生成） -->
+        <section class="panel-section" id="people-panel">
+          <button type="button" class="section-head" data-section="people" aria-expanded="true">
+            <span class="section-head-label">人员</span>
+            <span class="section-head-meta"><em id="people-total">0</em><i class="chev" aria-hidden="true">▾</i></span>
+          </button>
+          <div class="section-body">
+            <div class="btn-grid single">
+              <button type="button" class="tool-btn is-active" id="people-visible" aria-pressed="true">人员显示：显示</button>
+            </div>
+            <p class="people-summary" id="people-summary">—</p>
+            <p class="people-meta" id="people-models">—</p>
+            <p class="people-meta">气温　<em id="people-temp">—</em></p>
+            <p class="people-risk" id="people-risk">—</p>
+            <ul class="people-zones" id="people-zones"></ul>
+            <p class="people-note" id="people-note">隐藏仅影响显示，人数仍按实际状态统计</p>
+          </div>
+        </section>
+
+        <!-- 8. 风险模拟 + 处置措施 -->
+        <section class="panel-section">
+          <button type="button" class="section-head" data-section="risks" aria-expanded="true">
+            <span class="section-head-label">风险模拟</span>
+            <i class="chev" aria-hidden="true">▾</i>
+          </button>
+          <div class="section-body">
+            <div class="btn-grid" id="risk-buttons"></div>
+            <p class="risk-status" id="risk-status">当前无风险，工地运行正常</p>
+            <p class="risk-measures-title">处置措施</p>
+            <div class="btn-grid" id="risk-measures"></div>
+            <button type="button" id="risk-clear" class="clear-btn">全部解除</button>
+          </div>
+        </section>
+
+        <!-- 9. 场景对象（默认折叠，展开后跟随整面板滚动） -->
+        <section class="panel-section">
+          <button type="button" class="section-head is-collapsed" data-section="objects" aria-expanded="false">
+            <span class="section-head-label">场景对象</span>
+            <span class="section-head-meta"><em id="object-count">0</em><i class="chev" aria-hidden="true">▾</i></span>
+          </button>
+          <div class="section-body is-collapsed" id="object-block">
+            <ul id="object-list" class="object-list"></ul>
+          </div>
+        </section>
+      </aside>
+
+      <!-- 点选对象信息卡（左下，不与右侧面板重叠） -->
+      <aside class="hud hud-info" id="info-card" hidden>
+        <button type="button" id="info-close" class="info-close" aria-label="关闭">×</button>
+        <div class="info-head">
+          <h2 id="info-title">—</h2>
+          <span id="info-type" class="info-type">—</span>
+        </div>
+        <div id="info-body" class="info-body"></div>
+      </aside>
+
+      <!-- 底部操作提示 -->
+      <div class="hud hud-hint">
+        <p id="hint-text">左键拖拽 旋转　滚轮 缩放　右键拖拽 平移</p>
+      </div>
+
+      <!-- 漫游暂停遮罩：指针锁定被 Esc 打断后出现 -->
+      <div id="roam-overlay" class="roam-overlay" hidden>
+        <div class="roam-overlay-box">
+          <p class="roam-overlay-title">漫游已暂停</p>
+          <p class="roam-overlay-sub">点击画面继续漫游　·　点右上角「俯瞰」退出</p>
+        </div>
+      </div>
+
+      <!-- 加载遮罩 -->
+      <div id="loading">
+        <div class="loading-box">
+          <p class="loading-title">正在加载工地模型</p>
+          <div class="loading-bar"><span id="loading-fill"></span></div>
+          <p class="loading-text" id="loading-text">0%</p>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

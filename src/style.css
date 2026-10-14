@@ -1,0 +1,915 @@
+/* ============================================================
+   建筑工地数字孪生可视化平台 —— 界面样式
+   三维场景铺满全屏，UI 以半透明面板浮在上面
+   ============================================================ */
+
+:root {
+  --panel-bg: rgba(12, 22, 36, 0.72);
+  --panel-border: rgba(120, 190, 255, 0.22);
+  --text: #e8f1fb;
+  --text-dim: #8fa7bd;
+  --accent: #35d0c0;
+  --brand: #4d8bff;
+  --danger: #e0453a;
+  --radius: 10px;
+  /* 面板内的统一竖向间距：按钮栅格行距、分区标题与内容的间距都用它 */
+  --panel-gap: 5px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1420;
+  color: var(--text);
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+#viewport {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------------- HUD 公共 ---------------- */
+.hud {
+  position: absolute;
+  z-index: 10;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  padding: 9px 12px;
+  pointer-events: none;
+}
+
+.hud h1,
+.hud h2 {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ---------------- 顶部标题条（细） ---------------- */
+.hud-top {
+  top: 14px;
+  left: 14px;
+  max-width: 268px;
+  padding: 8px 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.hud-top h1 {
+  font-size: 13px;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.hud-top p {
+  margin: 5px 0 0;
+  font-size: 10.5px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+/* ============================================================
+   右侧统一面板：自上而下的分区栈，内容溢出时整体平滑滚动
+   ============================================================ */
+.hud-panel {
+  top: 14px;
+  right: 14px;
+  width: 232px;
+  max-height: calc(100vh - 40px);
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 190, 255, 0.35) transparent;
+  /* .hud 默认不吃鼠标事件，面板里的控件要单独放开 */
+  pointer-events: auto;
+  /* 必须盖在漫游暂停遮罩（z-index:30）上面，否则暂停时点不到「俯瞰」退不出去 */
+  z-index: 40;
+}
+
+.hud-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hud-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hud-panel::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(120, 190, 255, 0.32);
+}
+
+.hud-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 190, 255, 0.5);
+}
+
+/* 分区 */
+.panel-section {
+  flex: none;
+  /* 标题上下的间距都等于按钮行距（--panel-gap），保证各分区节奏一致 */
+  padding: var(--panel-gap) 11px calc(var(--panel-gap) + 2px);
+  border-bottom: 1px solid rgba(120, 190, 255, 0.12);
+}
+
+.panel-section:last-child {
+  border-bottom: none;
+}
+
+.panel-section[hidden] {
+  display: none;
+}
+
+/* 分区标题（可点击折叠）：上间距 = 下间距 = 按钮行距（--panel-gap） */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  margin: 0 0 var(--panel-gap);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.section-head:hover {
+  color: var(--text);
+}
+
+.section-head-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-head-label::before {
+  content: "";
+  flex: none;
+  width: 3px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.section-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-head-meta em {
+  font-style: normal;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.section-head .chev {
+  flex: none;
+  font-style: normal;
+  font-size: 10px;
+  color: var(--text-dim);
+  transition: transform 0.18s ease;
+}
+
+.section-head.is-collapsed .chev {
+  transform: rotate(-90deg);
+}
+
+/* 分区内容：统一竖向节奏，所有控件行间距都等于 --panel-gap */
+.section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--panel-gap);
+}
+
+.section-body.is-collapsed {
+  display: none;
+}
+
+/* 面板操作区：恢复默认按钮 */
+.panel-actions {
+  flex: none;
+  padding: 8px 11px;
+  border-bottom: 1px solid rgba(120, 190, 255, 0.12);
+}
+
+.reset-btn {
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid rgba(53, 208, 192, 0.5);
+  border-radius: 6px;
+  background: rgba(53, 208, 192, 0.14);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.reset-btn:hover {
+  background: rgba(53, 208, 192, 0.26);
+  color: #eafffb;
+}
+
+.reset-btn:active {
+  transform: translateY(1px);
+}
+
+/* 按钮栅格 */
+.btn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--panel-gap);
+}
+
+/* 单列按钮栅格：车辆灯光这类独占一行的开关 */
+.btn-grid.single {
+  grid-template-columns: 1fr;
+}
+
+.mode-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+/* ---------------- 通用小按钮 ---------------- */
+.tool-btn {
+  padding: 5px 6px;
+  border: 1px solid rgba(120, 190, 255, 0.35);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  text-align: center;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.tool-btn[hidden] {
+  display: none;
+}
+
+.tool-btn:hover {
+  color: var(--text);
+  background: rgba(120, 190, 255, 0.1);
+}
+
+.tool-btn.is-active {
+  color: #0b1420;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---------------- 俯瞰 / 漫游 模式按钮 ---------------- */
+.mode-btn {
+  padding: 6px 8px;
+  border: 1px solid rgba(120, 190, 255, 0.35);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.mode-btn:hover {
+  color: var(--text);
+  background: rgba(120, 190, 255, 0.1);
+}
+
+.mode-btn.is-active {
+  color: #0b1420;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---------------- 时间环境 ---------------- */
+.time-status {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- 设备动画（每台一行：按钮 + 该台的速度倍率） ---------------- */
+.anim-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--panel-gap);
+}
+
+.anim-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--panel-gap);
+}
+
+/* 行内速度条不要额外上下边距，保持与分区标题一致的紧凑节奏 */
+.anim-item .crane-row {
+  margin: 0;
+}
+
+/* ---------------- 塔吊 / 设备速度行（标签 + 滑块 + 数值） ---------------- */
+/* [标签] [滑块] [数值]：标签定宽左对齐，保证各行的滑块与按钮竖向对齐成一列 */
+.crane-row {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+}
+
+.crane-label {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.crane-value {
+  min-width: 44px;
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.crane-range {
+  width: 100%;
+  min-width: 64px; /* 保证一个可触达的最小拖动宽度 */
+  height: 3px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 2px;
+  background: rgba(120, 190, 255, 0.22);
+  cursor: pointer;
+}
+
+.crane-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.crane-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.crane-status {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-section.is-disabled {
+  opacity: 0.55;
+}
+
+/* ---------------- 风险模拟 ---------------- */
+.risk-btn.is-active {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+  font-weight: 600;
+}
+
+.risk-status {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.clear-btn {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid rgba(255, 120, 110, 0.5);
+  border-radius: 6px;
+  background: rgba(224, 69, 58, 0.12);
+  color: #ff9a8f;
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.clear-btn:hover {
+  background: rgba(224, 69, 58, 0.26);
+  color: #fff;
+}
+
+/* 处置措施 */
+.risk-measures-title {
+  margin: 3px 0 0;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+
+.measure-btn.is-active {
+  color: #0b1420;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---------------- 人员（实时在场人数 / 分区分布 / 气温 / 风险状态） ---------------- */
+.people-summary {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.people-meta {
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.people-meta em {
+  font-style: normal;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.people-risk {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.people-note {
+  margin: 0;
+  font-size: 9.5px;
+  line-height: 1.5;
+  color: rgba(143, 167, 189, 0.75);
+}
+
+.people-zones {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 10.5px;
+}
+
+.people-zones li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2.5px 0;
+  border-bottom: 1px solid rgba(120, 190, 255, 0.1);
+}
+
+.people-zones li:last-child {
+  border-bottom: none;
+}
+
+.people-zones span {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-dim);
+}
+
+.people-zones em {
+  flex: none;
+  font-style: normal;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.people-zones .zone-heat {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(224, 69, 58, 0.2);
+  color: #ff9a8f;
+  font-weight: 600;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- 场景对象（标题可折叠，展开后随整面板一起滚动，无嵌套滚动） ---------------- */
+.object-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 11.5px;
+}
+
+.object-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 3.5px 0;
+  border-bottom: 1px solid rgba(120, 190, 255, 0.1);
+}
+
+.object-list li:last-child {
+  border-bottom: none;
+}
+
+.object-list span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.object-list em {
+  flex: none;
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- 顶部居中风险告警条 ---------------- */
+.risk-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(560px, 56vw);
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 90, 80, 0.55);
+  border-radius: 8px;
+  background: rgba(122, 22, 18, 0.74);
+  backdrop-filter: blur(8px);
+  color: #ffd9d4;
+  font-size: 12px;
+  line-height: 1.3;
+  pointer-events: none;
+  animation: risk-pulse 1.2s ease-in-out infinite;
+}
+
+.risk-banner[hidden] {
+  display: none;
+}
+
+.risk-banner-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff5a50;
+  box-shadow: 0 0 10px #ff5a50;
+  animation: risk-blink 1s steps(1, end) infinite;
+}
+
+@keyframes risk-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(255, 60, 50, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(255, 60, 50, 0.6);
+  }
+}
+
+@keyframes risk-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0.25;
+  }
+}
+
+/* ---------------- 底部操作提示 ---------------- */
+.hud-hint {
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--text-dim);
+  max-width: calc(100vw - 320px);
+  text-align: center;
+}
+
+.hud-hint p {
+  margin: 0;
+}
+
+.hud-hint b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* ---------------- 点选对象信息卡（左下） ---------------- */
+.hud-info {
+  left: 14px;
+  bottom: 14px;
+  width: 246px;
+  max-height: 46vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 190, 255, 0.3) transparent;
+  padding: 9px 12px 11px;
+  pointer-events: auto;
+  z-index: 40;
+}
+
+.hud-info::-webkit-scrollbar {
+  width: 5px;
+}
+
+.hud-info::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(120, 190, 255, 0.3);
+}
+
+.hud-info[hidden] {
+  display: none;
+}
+
+.info-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.info-close:hover {
+  color: var(--text);
+  background: rgba(120, 190, 255, 0.14);
+}
+
+.info-head {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding-right: 18px;
+}
+
+.info-head h2 {
+  font-size: 13px;
+}
+
+.info-type {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(53, 208, 192, 0.16);
+  color: var(--accent);
+  font-size: 10px;
+}
+
+.info-body {
+  margin-top: 6px;
+}
+
+.info-desc {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.info-params {
+  list-style: none;
+  margin: 7px 0 0;
+  padding: 0;
+}
+
+.info-params li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2.5px 0;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(120, 190, 255, 0.1);
+}
+
+.info-params li:last-child {
+  border-bottom: none;
+}
+
+.info-params span {
+  color: var(--text-dim);
+}
+
+.info-params em {
+  font-style: normal;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.info-pos {
+  margin: 7px 0 0;
+  font-size: 10.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- 加载遮罩 ---------------- */
+#loading {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 40%, #16283d 0%, #0b1420 70%);
+  transition: opacity 0.5s ease;
+}
+
+#loading.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-box {
+  width: 320px;
+  text-align: center;
+}
+
+.loading-title {
+  margin: 0 0 16px;
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+
+.loading-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(120, 190, 255, 0.16);
+  overflow: hidden;
+}
+
+.loading-bar span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--brand), var(--accent));
+  transition: width 0.25s ease;
+}
+
+.loading-text {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.loading-error {
+  color: #ff8f7a;
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: left;
+  word-break: break-all;
+}
+
+/* ---------------- 漫游：准星与暂停遮罩 ---------------- */
+.crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 20;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.crosshair::before,
+.crosshair::after {
+  content: "";
+  position: absolute;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.65);
+}
+
+.crosshair::before {
+  left: 50%;
+  top: 0;
+  width: 1.5px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+.crosshair::after {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1.5px;
+  transform: translateY(-50%);
+}
+
+.roam-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 16, 26, 0.55);
+  cursor: pointer;
+}
+
+/* .roam-overlay 自己设了 display:flex，会盖掉 [hidden] 的 display:none，这里补回来 */
+.roam-overlay[hidden] {
+  display: none;
+}
+
+.roam-overlay-box {
+  padding: 22px 38px;
+  text-align: center;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  background: var(--panel-bg);
+}
+
+.roam-overlay-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.roam-overlay-sub {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
