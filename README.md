@@ -2,7 +2,7 @@
 
 浏览器里运行的建筑工地数字孪生：整块场地由一份平面布置表装配而成，塔吊、机械、人员、风险处置都能实时驱动，温度 / 人员 / 风险三套数据互相联动。
 
-模型由 Blender 脚本程序化生成，本仓库为前端可视化部分。
+仓库包含两部分：`blender/scripts/` 是用 Python 程序化生成全部模型的建模脚本，其余为前端可视化工程。
 
 ## 运行
 
@@ -15,12 +15,34 @@
 ## 目录结构
 
 - `index.html` 页面入口，importmap 指向本地 node_modules
-- `public/models/` 模型库，31 个 GLB，全部由脚本程序化生成
+- `public/models/` 模型库，31 个 GLB，全部由 `blender/scripts/` 生成
 - `src/config/` 平面布置表 layout.js、台账文案 info.js
 - `src/core/` 渲染视口 Viewer.js、模型加载 AssetLoader.js
 - `src/scene/` 场地装配、时间环境、塔吊、机械、人员、风险处置、车辆灯光
 - `src/controls/` 第一人称漫游、射线拾取
 - `src/ui/` 右侧控制面板
+- `blender/scripts/` 建模脚本（Blender 4.5 + Python）
+
+## 建模
+
+`blender/scripts/` 下用 MeshBuilder 拼基本体（盒 / 梁 / 柱 / 锥）搭出模型，按材质合批后导出 glTF。全部尺寸集中在 `config.py`，改参数即可整体调整：
+
+- `config.py` 尺寸参数表；`materials.py` 材质表
+- `utils.py` MeshBuilder 与导出工具
+- `parts_structure.py` 楼栋框架、塔吊、脚手架、基坑
+- `parts_machine.py` 挖掘机、翻斗车、搅拌车、路灯
+- `parts_facility.py` 板房生活区、大门、围挡、堆场、仓库、场地道路、休息棚、六种工人模型
+- `build_models.py` 批量生成入口；`render_preview.py` 生成预览图
+
+```bash
+# 在 blender/scripts 目录下执行，生成全部模型
+blender --background --python build_models.py
+
+# 只生成指定模型
+blender --background --python build_models.py -- labor_camp tower_crane
+```
+
+生成的 GLB 位于 `blender/output/glb/`，复制到 `public/models/` 后前端即可使用（构建产物目录已在 `.gitignore` 中忽略）。
 
 ## 主要功能
 
@@ -35,4 +57,4 @@
 
 ## 技术栈
 
-Three.js · WebGL · Vite · 原生 ES Module · glTF / GLB
+Three.js · WebGL · Vite · 原生 ES Module · glTF / GLB · Blender 4.5（Python 程序化建模）

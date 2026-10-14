@@ -15,3 +15,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Blender build output
+blender/output/
+__pycache__/
+*.pyc
