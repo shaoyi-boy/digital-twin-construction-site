@@ -2,10 +2,9 @@ import * as THREE from 'three'
 import { ZONES, rectArea, ASSEMBLY } from './zones.js'
 
 // 工地人员：克隆低模工人成一支施工队，按 zones.js 的分区撒点，程序化走路/跑动（无骨骼）。
-// 节点 Worker_Body/_ArmL/_ArmR/_LegL/_LegR 只做旋转/平移；状态 work/evac/safe/return，
-// 与风险联动由 main 按 Risks 的分区调 setHazard()，解除后 returnAll()。
+// 状态 work/evac/safe/return，与风险联动由 main 按 Risks 的分区调 setHazard()，解除后 returnAll()。
 
-// 参与人员构成的工人模型（key 内部用，file 为 public/models 下的文件名）
+// 工人模型清单（key 内部用，file 为 public/models 下的文件名）
 export const WORKER_MODELS = [
   { key: 'worker', file: 'worker.glb', label: '普通工人' },
   { key: 'hoe', file: 'worker_hoe.glb', label: '持镐工人' },
@@ -326,8 +325,7 @@ export class People {
       const b = w.blend * w.blend * (3 - 2 * w.blend)
       const idle = 1 - b
 
-      // 步频由 实际速度 / 腿长 推出，步幅≈地面位移，脚不打滑。
-      // 一个摆动周期 = 两步，故角频率 = π × 步频；无四肢的模型也照样推进相位。
+      // 步频由实际速度 / 腿长推出，步幅≈地面位移，脚不打滑；无四肢的模型也照样推进相位
       const ampFull = LEG_AMP_BASE + LEG_AMP_SPEED * w.speed
       const stride = Math.max(0.35, 2 * w.prof.legLen * Math.sin(Math.min(1.3, ampFull)))
       const omega = Math.PI * (w.speed / stride)
@@ -462,8 +460,8 @@ function measureLeg(legL) {
   return Math.max(0.4, hip.y - box.min.y)
 }
 
-// 判断模型正面的水平轴：用腿判定（脚朝前伸得更远，腿的包围盒相对髋是不对称的），
-// 可避开手里的镐 / 图纸等把躯干包围盒撑歪；腿不明显时退回用躯干。
+// 判断模型正面的水平轴：用腿判定（脚朝前伸得更远，腿的包围盒相对髋不对称），
+// 可避开手里的镐 / 图纸把躯干包围盒撑歪；腿不明显时退回用躯干。
 function detectFacing(base, legL, body) {
   base.updateMatrixWorld(true)
 

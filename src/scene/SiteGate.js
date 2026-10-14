@@ -1,30 +1,13 @@
 import * as THREE from 'three'
 
-/**
- * 大门开合动画（对开蓝门）
- *
- * Blender 里两扇蓝门是独立导出的节点：
- *
- *   SiteGate_LeafL —— 左扇，物体原点在门洞西端铰链轴上，局部 +X 伸向门洞正中
- *   SiteGate_LeafR —— 右扇，物体原点在门洞东端铰链轴上，局部 -X 伸向门洞正中
- *
- * 两扇的几何都是「闭合」姿态（两扇在门洞正中相接、填满车道），所以：
- *   0°  = 关门（默认）；转到 OPEN_DEG 就是开门，两扇各自绕自身竖直轴（three.js 局部 Y）
- *   反向摆开，始终关于门洞中线对称。门柱在门洞两端之外，围挡在 Δz=0 那条线上，
- *   两扇朝场内摆到 OPEN_DEG（<90°）都不会碰到门柱，也不会扫到围挡。
- *
- * 本类只做一件事：把「开合进度 k ∈ [0,1]」按 smoothstep 缓动后写到两扇的 rotation.y。
- * k 以恒定速度线性推进（1.0× 时约 2 秒走完 0→1），因此：
- *   · 起、停都平滑，不跳变；
- *   · 两个方向都能走，可反复切换、幂等；
- *   · 到端点严格夹在 0 / 1，两扇永远对称，停在极限角度上不会抖。
- */
+// 大门开合。左扇 SiteGate_LeafL 原点在门洞西端铰链，局部 +X 伸向门洞正中，右扇对称。
+// 模型按关门姿态建的，0° 关、转到 OPEN_DEG 开，两扇绕各自竖直轴反向摆开。
 
-/** 开门极限角度（度）：接近 90° 但不贴平，避免与门柱/围挡产生视觉穿插 */
+// 开门极限角度（度），不贴平免得插到门柱和围挡
 const OPEN_DEG = 88
-/** 进度 0→1 的基准时长（秒），速度倍率按比例缩放到时间轴上 */
+// 进度 0→1 的基准时长（秒）
 const DURATION = 2.0
-/** 速度倍率范围 */
+// 速度倍率范围
 const SPEED_MIN = 0.2
 const SPEED_MAX = 3.0
 
@@ -36,7 +19,7 @@ const smooth = (t) => {
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 
 export class SiteGate {
-  /** @param {THREE.Object3D} root 场地上那座大门对象（site_gate.glb 的克隆） */
+  // root 是场地里那座大门对象
   constructor(root) {
     this.root = root
     this.available = false
@@ -55,15 +38,15 @@ export class SiteGate {
       return
     }
 
-    this.open = false        // 目标状态：false 关 / true 开
-    this.k = 0               // 开合进度 0(关) ~ 1(开)
-    this.speed = 1           // 速度倍率
+    this.open = false // 目标状态：false 关 true 开
+    this.k = 0 // 开合进度 0 关 ~ 1 开
+    this.speed = 1 // 速度倍率
 
     this.applyPose()
     this.available = true
   }
 
-  /** 面板状态（供 Hud 渲染） */
+  // 给面板渲染用的状态
   get state() {
     return {
       available: this.available,
@@ -74,19 +57,18 @@ export class SiteGate {
     }
   }
 
-  /** 开 / 关切换：幂等，重复点击只是把目标翻到另一侧 */
   toggle() {
     this.open = !this.open
     return this.open
   }
 
-  /** 设定开合速度倍率（0.2× ~ 3×）：只缩放推进快慢，不改当前相位，动画不会跳 */
+  // 只改推进快慢，不改相位，不会跳
   setSpeed(v) {
     this.speed = clamp(v, SPEED_MIN, SPEED_MAX)
     return this.speed
   }
 
-  /** 复位：关门 + 速度倍率回 1.0×（交给 update 缓动走到 0°，不会硬切） */
+  // 关门 + 速度回 1，交给 update 缓动到 0°，不硬切
   reset() {
     this.open = false
     this.speed = 1
@@ -103,7 +85,7 @@ export class SiteGate {
     this.applyPose()
   }
 
-  /** 两扇对称开合：左扇 +θ、右扇 −θ（都朝场内摆，互不干涉、也不碰门柱） */
+  // 左扇 +θ、右扇 -θ，都朝场内摆
   applyPose() {
     const rad = THREE.MathUtils.degToRad(OPEN_DEG * smooth(this.k))
     this.leafL.rotation.y = rad

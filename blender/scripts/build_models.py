@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""模型批量生成入口。blender --background --python build_models.py [-- 模型名...]"""
+"""模型批量生成入口。"""
 
 import os
 import sys
@@ -106,7 +106,7 @@ def main():
             continue
         try:
             verts, faces, size_kb = build_one(name, builder)
-        except Exception as exc:                      # noqa: BLE001
+        except Exception as exc:
             print("[失败] %-16s %s" % (name, exc))
             import traceback
             traceback.print_exc()

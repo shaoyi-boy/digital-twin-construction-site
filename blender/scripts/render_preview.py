@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
-"""模型预览渲染，给每个模型渲一张 3/4 视角图，方便看造型和配色。
-
-用法：blender --background --factory-startup --python render_preview.py [-- 模型名...]
-"""
+"""模型预览渲染，给每个模型渲一张 3/4 视角图，方便看造型和配色。"""
 
 import os
 import sys
@@ -38,7 +35,7 @@ def scene_bounds():
 
 
 def setup_camera(lo, hi):
-    """按包围球自动取景。取水平/竖直里小的视场角算距离，细长模型才不会被切。"""
+    """按包围球自动取景，取水平 / 竖直里小的视场角算距离。"""
     center = (lo + hi) / 2.0
     radius = (hi - lo).length / 2.0
     if radius < 1e-3:
@@ -57,7 +54,7 @@ def setup_camera(lo, hi):
     half_v = math.atan((sensor * aspect / 2.0) / cam_data.lens)
     dist = radius / math.sin(min(half_h, half_v)) * 1.15      # 1.15 是留白系数
 
-    # 3/4 视角；板房门窗、脚手架安全网都做在 +Y 一侧，是模型正面
+    # 3/4 视角，模型正面在 +Y 侧
     direction = Vector((1.0, 1.15, 0.72)).normalized()
     cam.location = center + direction * dist
     look = (center - cam.location).normalized()
@@ -72,7 +69,7 @@ def setup_light_and_world():
     sun_data.energy = 4.0
     sun_data.angle = math.radians(6.0)
     sun = bpy.data.objects.new("Sun", sun_data)
-    # 光从和相机同侧打过来，模型正面才不会全在阴影里
+    # 光从相机同侧打来，正面才不会全在阴影里
     sun.rotation_euler = (math.radians(50), 0, math.radians(145))
     bpy.context.scene.collection.objects.link(sun)
 
@@ -101,7 +98,7 @@ def render_one(name, builder):
     reset_scene()
     builder(get_collection(name))
 
-    setup_render()                     # 先定分辨率，相机才能按画幅算取景距离
+    setup_render()                     # 先定分辨率，相机才能按画幅算距离
     lo, hi = scene_bounds()
     setup_camera(lo, hi)
     setup_light_and_world()
@@ -127,7 +124,7 @@ def main():
         try:
             out = render_one(name, builder)
             print("[预览] %-16s -> %s" % (name, out))
-        except Exception as exc:                        # noqa: BLE001
+        except Exception as exc:
             print("[预览失败] %-16s %s" % (name, exc))
 
 

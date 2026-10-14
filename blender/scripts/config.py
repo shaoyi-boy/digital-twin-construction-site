@@ -9,9 +9,9 @@ GLB_DIR = os.path.join(ROOT_DIR, "output", "glb")
 BLEND_DIR = os.path.join(ROOT_DIR, "output", "blend")
 
 # 全局开关
-FLAT_SHADING = True     # 低模：关掉平滑，保留硬转折
-EXPORT_DRACO = False    # 想压体积就改 True，前端要挂 DRACOLoader
-SEGMENTS = 12           # 圆柱默认分段，低模 8~12 够
+FLAT_SHADING = True     # 低模，关掉平滑保留硬转折
+EXPORT_DRACO = False    # 改 True 要压体积，前端得挂 DRACOLoader
+SEGMENTS = 12           # 圆柱默认分段，低模够用
 
 # 塔吊（参考 QTZ63 自升式）
 CRANE_MAST_SIZE = 1.8       # 标准节截面边长
@@ -21,8 +21,8 @@ CRANE_MEMBER = 0.10         # 桁架杆件截面
 CRANE_JIB_LEN = 40.0        # 大臂长度
 CRANE_COUNTER_LEN = 12.0    # 平衡臂长度
 CRANE_CAB_SIZE = (1.6, 1.6, 2.0)   # 司机室尺寸
-CRANE_WALL_TIE_Z = [12.0]               # 附墙标高（相对基础顶），只留能锚进楼层的一道
-CRANE_WALL_TIE_REACH = 6.0              # 附墙杆伸出长度，刚好顶到 1 号楼东外墙
+CRANE_WALL_TIE_Z = [12.0]               # 附墙标高，只留能锚进楼层的一道
+CRANE_WALL_TIE_REACH = 6.0              # 附墙杆伸出，刚好顶到 1 号楼东外墙
 CRANE_LADDER_FACE = -1                  # 爬梯所在面，-1 表示 -Y 面
 CRANE_REST_PLATFORM_Z = 15.0            # 休息平台标高
 
@@ -78,14 +78,14 @@ ROAD_WIDTH = 7.0            # 场内主路宽度
 
 # 土方作业区（基坑 / 土堆）
 PIT_ENABLE = True           # 置 False 时地面整块铺素土
-# 基坑矩形 (x0, x1, y0, y1)，场地局部坐标，X 向右、Y 向前
+# 基坑矩形 (x0, x1, y0, y1)，场地局部坐标
 PITS = [
     (-32.0, -12.0, 29.0, 51.0),   # 西坑
     (-5.0, 12.0, 29.0, 51.0),
 ]
 PIT_DEPTH = 1.8             # 基坑深度
 PIT_WALL = 0.5              # 坑壁厚度
-# 土堆改成独立模型 dirt_pile，位置和大小见前端 layout.js
+# 土堆改成独立模型 dirt_pile，位置大小见前端 layout.js
 
 # 路灯
 LAMP_HEIGHT = 9.0           # 灯杆高度

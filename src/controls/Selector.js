@@ -1,27 +1,13 @@
 import * as THREE from 'three'
 
-/**
- * 点选拾取
- *
- * 在画面上单击某个模型时，向上找到它所属的整台模型
- * （SiteRoot 的直接子节点，带 label / source 信息），
- * 用一个线框盒高亮，并把结果交给回调去显示信息卡。
- *
- * 只有「按下 → 抬起」几乎没移动时才判定为点选，
- * 否则会和 OrbitControls 的左键拖拽旋转冲突。
- */
+// 点选拾取：单击时向上找到 SiteRoot 下那一整台，用线框盒高亮并弹信息卡
+// 按下到抬起几乎没移动才算点选，否则和 OrbitControls 左键拖拽冲突
 
-const CLICK_MOVE_LIMIT = 6   // 像素：超过就当成拖拽
+const CLICK_MOVE_LIMIT = 6 // 像素，超过算拖拽
 const CLICK_TIME_LIMIT = 600 // 毫秒
 
 export class Selector {
-  /**
-   * @param {import('../core/Viewer.js').Viewer} viewer
-   * @param {object} options
-   * @param {THREE.Object3D} options.root 场景根节点（SiteRoot）
-   * @param {Function} [options.onPick] 选中回调，参数是对象或 null
-   * @param {Function} [options.isEnabled] 返回 false 时忽略点选（例如漫游模式）
-   */
+  // root 是 SiteRoot；isEnabled 返回 false 时忽略点选（漫游模式靠它屏蔽）
   constructor(viewer, { root, onPick, isEnabled } = {}) {
     this.viewer = viewer
     this.root = root
@@ -48,7 +34,7 @@ export class Selector {
     el.addEventListener('pointerup', this._onUp)
   }
 
-  /** 每帧刷新高亮框（挖掘机之类的对象会动，包围盒要跟着走） */
+  // 会动的对象（挖掘机）包围盒要跟着刷新
   update() {
     if (this.selected && this.selected.userData?.interactive) {
       this.helper.setFromObject(this.selected)
@@ -56,7 +42,6 @@ export class Selector {
     return undefined
   }
 
-  /** 主动清除选中 */
   clear() {
     this.selected = null
     this.helper.visible = false
@@ -89,7 +74,7 @@ export class Selector {
     this.onPick?.(hit)
   }
 
-  /** 射线拾取，返回 SiteRoot 下的整台模型对象 */
+  // 射线拾取，返回 SiteRoot 下的整台模型对象
   pick(clientX, clientY) {
     const rect = this.viewer.renderer.domElement.getBoundingClientRect()
     this.pointer.set(
@@ -106,7 +91,7 @@ export class Selector {
     return null
   }
 
-  /** 沿父级向上找到挂在 SiteRoot 下的那一层 */
+  // 沿父级向上找到挂在 SiteRoot 下的那一层
   ownerOf(node) {
     let cur = node
     while (cur && cur.parent && cur.parent !== this.root) cur = cur.parent

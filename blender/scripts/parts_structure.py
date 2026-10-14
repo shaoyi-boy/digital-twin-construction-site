@@ -9,11 +9,8 @@ import config as C
 
 # 塔吊（QTZ63 自升式）
 def build_tower_crane(collection=None):
-    """QTZ63 自升式塔吊，拆成 5 个节点，和前端 Crane.js 的约定对应。
-
-    TowerCrane 根 -> TowerCrane_Slew 回转体 -> TowerCrane_Trolley 小车、
-    TowerCrane_HookRope 钢丝绳（原点在绳顶，scale.z 控制绳长）、
-    TowerCrane_HookBlock 吊钩。各节点在局部坐标里建模再摆回原位。
+    """QTZ63 塔吊，拆成 5 个节点，对应前端 Crane.js 的约定。
+    根 -> Slew 回转体 -> Trolley 小车 / HookRope 钢丝绳 / HookBlock 吊钩。
     """
     root = MeshBuilder("TowerCrane")
     slew = MeshBuilder("TowerCrane_Slew")
@@ -30,7 +27,7 @@ def build_tower_crane(collection=None):
 
     base_z = 1.0
     mast_top = base_z + C.CRANE_SECTION_N * h      # 塔身顶部标高
-    slew_z = mast_top + 0.4                        # 回转支承中心标高 = 上部结构回转轴
+    slew_z = mast_top + 0.4                        # 回转支承中心标高
     dz = slew_z                                    # 回转局部坐标 = 世界坐标 - dz
 
     # 不动部分（根节点）
@@ -52,7 +49,7 @@ def build_tower_crane(collection=None):
         for sx in (-half, half):
             root.beam((sx, -half, z1 - m), (sx, half, z1 - m), m, mat=yellow)
 
-        # 斜腹杆，相邻节交替方向成 Z 字
+        # 斜腹杆，相邻节交替成 Z 字
         if i % 2 == 0:
             root.beam((-half, -half, z0), (half, -half, z1 - m), m * 0.85, mat=yellow)
             root.beam((half, half, z0), (-half, half, z1 - m), m * 0.85, mat=yellow)
@@ -60,7 +57,7 @@ def build_tower_crane(collection=None):
             root.beam((half, -half, z0), (-half, -half, z1 - m), m * 0.85, mat=yellow)
             root.beam((-half, half, z0), (half, half, z1 - m), m * 0.85, mat=yellow)
 
-    # 标准节连接节点板，每个节头四角一块
+    # 节点板，每个节头四角一块
     for i in range(1, C.CRANE_SECTION_N):
         zj = base_z + i * h
         for sx in (-half, half):
@@ -127,7 +124,7 @@ def build_tower_crane(collection=None):
     root.cylinder(0.04, mast_top - base_z, (-(half + 0.08), 0.0, (base_z + mast_top) / 2.0),
                   mat="cable_black", segments=6)
 
-    # 回转部分（Slew），所有 z 减 dz，原点落在回转支承中心
+    # 回转部分，所有 z 减 dz，原点在回转支承中心
 
     # 回转机构
     slew.box((2.4, 2.4, 0.8), (0, 0, slew_z - dz), mat=gray)
@@ -190,7 +187,7 @@ def build_tower_crane(collection=None):
         slew.beam((x, -0.5, zbs), (x, 0.0, zbs + 1.1), chord * 0.8, mat=yellow)
         slew.beam((x, 0.5, zbs), (x, 0.0, zbs + 1.1), chord * 0.8, mat=yellow)
 
-    # 平衡臂走道平台，配重和卷扬机都坐上面
+    # 平衡臂走道平台
     deck_z = zb + 0.03
     deck_x0 = cj_x1 - 0.55                  # 平台尾部，配重外侧留出挡板位
     deck_x1 = cj_x0 + 0.15                  # 平台根部
@@ -198,7 +195,7 @@ def build_tower_crane(collection=None):
     deck_len = deck_x1 - deck_x0
     slew.box((deck_len, 1.06, 0.06), (deck_cx, 0.0, deck_z - dz), mat=gray)
 
-    # 配重块组，4 组板夹住平台上下叠放（下 2.00m / 上 1.02m）
+    # 配重块，4 组夹住平台上下叠放（下 2.00m / 上 1.02m）
     cwt, cw_gap = 0.55, 0.07
     cw_ws = (1.30, 1.24, 1.30, 1.24)
     cw_h_lo, cw_h_up = 2.00, 1.02
@@ -231,7 +228,7 @@ def build_tower_crane(collection=None):
     # 塔帽顶盖
     slew.box((0.44, 0.44, 0.26), (0.0, 0.0, apex_top_z - 0.10 - dz), mat=gray)
 
-    # 臂根与塔身连接段，消除 0.4m 悬空断口
+    # 臂根与塔身连接段
     slew_top = slew_z + 0.4
     slew_bot = slew_z - 0.4
     for ry in (-0.55, 0.55):
@@ -263,7 +260,7 @@ def build_tower_crane(collection=None):
     slew.box((cab_w + 0.6, cab_d + 0.6, 0.06), (cab_cx, 0.0, mast_top + cab_h + 0.10 - dz),
              mat="roof_blue")
 
-    # 起升卷扬机，坐平衡臂平台上
+    # 起升卷扬机
     winch_x = -4.2
     slew.box((2.35, 1.16, 0.08), (winch_x, 0.0, deck_z + 0.07 - dz), mat=gray)
     slew.box((2.0, 1.0, 1.0), (winch_x, 0.0, deck_z + 0.11 + 0.5 - dz), mat=gray)
@@ -296,7 +293,7 @@ def build_tower_crane(collection=None):
     slew.cylinder(0.12, 0.16, (0.0, 0.0, apex_top_z + 2.6 - dz), mat="lamp_red", segments=8)
     slew.cylinder(0.10, 0.18, (jib_x1, 0.0, zt + 0.10 - dz), mat="lamp_red", segments=8)
 
-    # 变幅小车（Trolley），原点在小车中心，静态摆跨中
+    # 变幅小车，原点在小车中心
     trolley_x = jib_x0 + jib_len * 0.5
     for sy in (-0.5, 0.5):
         # 走轮骑在下弦上
@@ -304,15 +301,15 @@ def build_tower_crane(collection=None):
                          rotation=(math.pi / 2.0, 0, 0), mat=gray, segments=8)
     trolley.box((1.1, 1.4, 0.45), (0.0, 0.0, -0.25), mat="paint_red")
 
-    # 起升钢丝绳（HookRope），原点在绳顶，几何沿局部 +Y 向下；
-    # 节点绕 X 转 -90°，导出到 three.js 后缩放 scale.z 就是改绳长。
+    # 起升钢丝绳，原点在绳顶，几何沿局部 +Y 向下；
+    # 节点绕 X 转 -90°，导出后缩放 scale.z 就是改绳长。
     rope_len = 11.0
     rope_top_z = zb - 0.45
     rope.cylinder(0.03, rope_len, (0.0, rope_len / 2.0, 0.0),
                   rotation=(math.pi / 2.0, 0, 0), mat="cable_black", segments=6)
 
-    # 吊钩总成（HookBlock），原点在滑轮组顶面
-    hook_top_offset = 0.125                 # 顶面相对 rope_len 基准上抬一点，跟绳底接上
+    # 吊钩总成，原点在滑轮组顶面
+    hook_top_offset = 0.125                 # 上抬一点，跟绳底接上
     hook.box((0.52, 0.52, 0.85), (0.0, 0.0, -0.425), mat="paint_red")        # 滑轮组外壳
     hook.cylinder(0.20, 0.52, (0.0, 0.0, -0.675),
                   rotation=(math.pi / 2.0, 0, 0), mat=gray, segments=8)       # 滑轮
@@ -438,7 +435,7 @@ def build_scaffolding(collection=None):
         for y in (0.0, dy):
             b.beam((0.0, y, z), (len_x, y, z), C.SCAF_TUBE, mat=tube)
 
-    # 小横杆，把内外两排拉结成整体
+    # 小横杆，拉结内外两排
     for k in range(nh + 1):
         z = k * dh
         for i in range(nx + 1):
@@ -531,9 +528,9 @@ def build_scaffolding(collection=None):
     return b.build(collection)
 
 
-# 玻璃幕墙（4 号楼几乎完工外观用）
+# 玻璃幕墙（4 号楼用）
 def _add_entrance(b, ent_cx, g_off):
-    """首层南立面入口：玻璃双开门 + 门框 + 雨棚 + 台阶。台阶落在基础底板上。"""
+    """首层南立面入口：玻璃双开门 + 门框 + 雨棚 + 台阶。"""
     door_y = -g_off - 0.07            # 门扇在玻璃外皮再外 0.07m
     thr = 0.85                        # 入口平台（台阶顶）标高
     dh = 2.0                          # 门高，门顶 2.85 < 梁底 2.9
@@ -560,7 +557,7 @@ def _add_entrance(b, ent_cx, g_off):
 
 
 def _add_roof_equipment(b, top):
-    """屋面收尾设备，都布置在女儿墙内、避开顶层预留洞，总高不超过 +2m。"""
+    """屋面设备，布置在女儿墙内、避开顶层预留洞。"""
     # 出屋面楼梯间 + 门 + 避雷针
     b.box((3.4, 2.8, 2.3), (3.2, 15.0, top + 1.15), mat="wall_white")
     b.box((1.0, 0.10, 2.0), (3.2, 13.55, top + 1.00), mat="door_gray")
@@ -585,8 +582,7 @@ def _add_roof_equipment(b, top):
 
 
 def _add_finished_facade(b, grid, n_bay, hh, nz, col, bh, slab, size_x, size_y):
-    """四周挂一圈透明玻璃幕墙，把裸框架做成「几乎完工」的楼宇。
-
+    """四周挂一圈玻璃幕墙，把裸框架做成「几乎完工」的楼宇。
     只在 facade=True（4 号楼）时调用，玻璃比柱外皮内缩 0.10m，南立面中央做入口。
     """
     half = col / 2.0                  # 柱外皮到柱轴线
@@ -685,10 +681,7 @@ def _add_finished_facade(b, grid, n_bay, hh, nz, col, bh, slab, size_x, size_y):
 
 # 在建楼层（现浇框架）
 def build_building_frame(collection=None, extra=0, name="BuildingFrame", facade=False):
-    """现浇框架楼层。
-
-    extra>0 时往上再加 extra 层新浇筑层：用更浅的混凝土色，不砌墙不搭梯，顶板挂木模。
-    """
+    """现浇框架楼层。extra>0 时上面再加 extra 层新浇筑层，颜色更浅、不砌墙。"""
     b = MeshBuilder(name)
     grid = C.FRAME_GRID
     nx = C.FRAME_SPAN_X
@@ -753,7 +746,7 @@ def build_building_frame(collection=None, extra=0, name="BuildingFrame", facade=
                       (i * grid + grid / 2.0, j * grid + grid / 2.0,
                        z0 + hh + slab / 2.0), mat=cmat)
 
-    # 楼梯：单跑直梯，贴柱网东侧沿 +Y 上行。18 级，西侧留上下楼空地
+    # 楼梯：单跑直梯，贴柱网东侧沿 +Y 上行，18 级
     sw = 1.4                        # 梯段宽
     going = 0.26                    # 踏步宽
     riser_n = 18                    # 总级数
@@ -907,7 +900,7 @@ def build_building_frame(collection=None, extra=0, name="BuildingFrame", facade=
                         b.beam((rx, ry, new_top), (rx, ry, new_top + 0.55), 0.028,
                                mat="rebar")
 
-    # 4 号楼专用：挂玻璃幕墙
+    # 4 号楼专用，挂玻璃幕墙
     if facade:
         _add_finished_facade(b, grid, nx, hh, nz, col, bh, slab, size_x, size_y)
 

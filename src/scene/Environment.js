@@ -1,31 +1,16 @@
 import * as THREE from 'three'
 
-/**
- * 时间环境
- *
- * 天空、雾、光照、曝光、背景色，以及四个「时间预设」之间的平滑过渡。
- * 工地本体（110×110 的场地与道路）是 Blender 里做好的模型，
- * 这里只负责别让它「悬在空中」，并让它随一天中的时间变亮变暗。
- *
- * 四个预设覆盖一天里的四个典型时刻：
- *   清晨 06:00  太阳低悬东侧、暖橙光、晨雾   16 °C
- *   正午 12:00  太阳高照、近白光、通透       34 °C
- *   夜晚 18:00  太阳低垂西侧、深橙红光、暖霾 21 °C
- *   凌晨 00:00  太阳落到地平线以下，只剩冷蓝月光 + 低环境光 9 °C
- *
- * setTimePreset(key) 会在约 0.8 秒内把以下量全部插值到位：
- *   太阳（位置 / 颜色 / 强度）、月亮（冷蓝，凌晨专用）、半球光（天空色 / 地面色 / 强度）、
- *   雾（颜色 / 密度）、渲染器 toneMappingExposure、天空球渐变色与场景背景色。
- */
+// 时间环境：天空、雾、光照、曝光、背景色，以及四个时间预设之间的平滑过渡。
+// 工地本体（110×110 场地与道路）是 Blender 里做好的模型，这里只负责让它随一天的时间变亮变暗。
 
-/** 光源（太阳 / 月亮）到场景中心的距离，决定阴影投射的远近 */
+// 光源（太阳 / 月亮）到场景中心的距离，决定阴影投射的远近
 const TRAVEL = 200
 
-/** 过渡时长（秒） */
+// 过渡时长，秒
 const DURATION = 0.8
 
-/** 用「方位角（度）+ 仰角（度）」描述光源方向，再换算成世界坐标
- *  方位角 90° → +X（东），270° → -X（西），0° → +Z（南） */
+// 用「方位角(度)+仰角(度)」描述光源方向，再换算成世界坐标。
+// 方位角 90° → +X（东），270° → -X（西），0° → +Z（南）
 function dirPos(azDeg, elevDeg, dist = TRAVEL) {
   const az = THREE.MathUtils.degToRad(azDeg)
   const el = THREE.MathUtils.degToRad(elevDeg)
@@ -92,26 +77,25 @@ const PRESETS = [
   },
 ]
 
-/** easeInOutCubic：起步慢、中间快、收尾慢 */
+// easeInOutCubic：起步慢、中间快、收尾慢
 function easeInOut(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 }
 
 class TimeEnvironment {
-  /** @param {import('../core/Viewer.js').Viewer} viewer */
   constructor(viewer) {
     this.viewer = viewer
     const { scene } = viewer
 
-    // ---------------- 雾（指数雾，密度随预设变化） ----------------
+    // 雾，指数雾，密度随预设变化
     scene.fog = new THREE.FogExp2(0xcfe0f0, 0.0011)
 
-    // ---------------- 天空球 + 兜底地面 ----------------
+    // 天空球 + 兜底地面
     this.sky = createSkyDome()
     scene.add(this.sky)
     scene.add(createFallbackGround())
 
-    // ---------------- 光照 ----------------
+    // 光照
     // 天光：给暗部补一点环境色，避免阴影里死黑
     this.hemi = new THREE.HemisphereLight(0xcfe3ff, 0x8a8272, 1.15)
     this.hemi.position.set(0, 60, 0)
@@ -149,16 +133,13 @@ class TimeEnvironment {
     this.presets = PRESETS
     this.activeKey = 'noon'
     this.duration = DURATION
-    /** 过渡动画状态：{ from, to, elapsed } */
+    // 过渡动画状态：{ from, to, elapsed }
     this.anim = null
 
-    /**
-     * 火场「热浪」叠加层（0~1）：不影响时间预设本身，只在其结果之上
-     * 再叠一层曝光抬升 + 雾色偏暖，火灾时让画面出现热霾感。
-     */
+    // 火场「热浪」叠加层 0~1：不影响预设本身，只在其结果上再叠一层曝光 + 暖雾
     this.heat = 0
     this.heatFog = new THREE.Color(0xff8a4a)
-    /** 记录「基准」曝光 / 雾色（时间预设算出来的值），供热浪叠加层复用 */
+    // 基准曝光 / 雾色（时间预设算出来的值），供热浪层复用
     this._baseExposure = 1.05
     this._baseFogColor = new THREE.Color(0xcfe0f0)
 
@@ -166,32 +147,29 @@ class TimeEnvironment {
     this._write(this._targetFrom(PRESETS.find((p) => p.key === 'noon')))
   }
 
-  /** 面板用：预设清单 */
+  // 面板用：预设清单
   get list() {
     return this.presets.map((p) => ({ key: p.key, label: p.label }))
   }
 
-  /** 当前时钟 / 温度文案 */
+  // 当前时钟 / 温度文案
   get statusText() {
     const p = this.presets.find((x) => x.key === this.activeKey)
     return `当前 ${p.clock}　·　${p.temp}`
   }
 
-  /** 当前预设的气温（数值，单位 °C），「人员」面板里的基础气温用它 */
+  // 当前预设的气温（°C），「人员」面板里的基础气温用它
   get temperatureC() {
     const p = this.presets.find((x) => x.key === this.activeKey)
     return p?.tempC ?? 0
   }
 
-  /**
-   * 设定火场热浪强度（0~1）。只叠加在时间预设的曝光 / 雾色之上，
-   * 不改变预设本身，因此切时间预设、点「恢复默认」都不会被它污染。
-   */
+  // 设火场热浪强度 0~1：只叠在时间预设的曝光 / 雾色之上，不改变预设本身
   setHeat(v) {
     this.heat = Math.min(1, Math.max(0, v))
   }
 
-  /** 切换时间预设，默认 0.8 秒平滑过渡 */
+  // 切时间预设，默认 0.8 秒平滑过渡
   setTimePreset(key, duration = this.duration) {
     const preset = this.presets.find((p) => p.key === key)
     if (!preset) return
@@ -206,7 +184,7 @@ class TimeEnvironment {
     this.anim = { from: this._read(), to, elapsed: 0, duration }
   }
 
-  /** 每帧推进过渡（由 viewer.onUpdate 调用） */
+  // 每帧推进过渡，由 viewer.onUpdate 调用
   update(dt) {
     const a = this.anim
     if (a) {
@@ -240,7 +218,7 @@ class TimeEnvironment {
       u.bottomColor.value.copy(f.skyBottom).lerp(g.skyBottom, e)
       this.viewer.scene.background.copy(f.bg).lerp(g.bg, e)
 
-      // 记录「基准」值（不含热浪叠加），供热浪层每帧重新叠加，避免累积漂移
+      // 记下「基准」值（不含热浪叠加），供热浪层每帧重算，避免累积漂移
       this._baseExposure = this.viewer.renderer.toneMappingExposure
       this._baseFogColor.copy(fog.color)
 
@@ -250,11 +228,11 @@ class TimeEnvironment {
       }
     }
 
-    // 热浪叠加层每帧都要重算：时间预设动画结束后也一样生效
+    // 热浪层每帧都要重算，时间预设动画结束后照样生效
     this._applyHeat()
   }
 
-  /** 把火场热浪叠加在时间预设结果之上（曝光抬升 + 雾色偏暖） */
+  // 把火场热浪叠在预设结果之上：曝光抬升 + 雾色偏暖
   _applyHeat() {
     const h = this.heat
     this.viewer.renderer.toneMappingExposure = this._baseExposure * (1 + h * 0.14)
@@ -262,11 +240,9 @@ class TimeEnvironment {
     fog.color.copy(this._baseFogColor).lerp(this.heatFog, h * 0.35)
   }
 
-  // ------------------------------------------------------------------
   // 内部：读写状态
-  // ------------------------------------------------------------------
 
-  /** 把预设换算成一份完整的目标状态 */
+  // 预设 → 一份完整的目标状态
   _targetFrom(p) {
     return {
       sunPos: dirPos(p.sun.az, p.sun.elev),
@@ -287,7 +263,7 @@ class TimeEnvironment {
     }
   }
 
-  /** 读取当前实际状态，作为过渡起点 */
+  // 读当前实际状态，作为过渡起点
   _read() {
     const fog = this.viewer.scene.fog
     const u = this.sky.material.uniforms
@@ -310,7 +286,7 @@ class TimeEnvironment {
     }
   }
 
-  /** 把一份状态写进各个对象 */
+  // 把一份状态写进各个对象
   _write(s) {
     this.sun.position.copy(s.sunPos)
     this.sun.color.copy(s.sunColor)
@@ -343,7 +319,7 @@ class TimeEnvironment {
   }
 }
 
-/** 渐变天空球：从顶部深蓝过渡到地平线浅灰 */
+// 渐变天空球：顶部深蓝过渡到地平线浅灰
 function createSkyDome() {
   const geometry = new THREE.SphereGeometry(760, 32, 18)
   const material = new THREE.ShaderMaterial({
@@ -383,10 +359,7 @@ function createSkyDome() {
   return sky
 }
 
-/**
- * 场地外的兜底地面。
- * 高度压到 -0.1，正好藏在场地模型下方，只在场地之外的区域露出来。
- */
+// 场地外的兜底地面，高度压到 -0.1，藏在场地模型下方，只在场地之外露出来
 function createFallbackGround() {
   const geometry = new THREE.PlaneGeometry(1600, 1600)
   geometry.rotateX(-Math.PI / 2)
@@ -404,11 +377,7 @@ function createFallbackGround() {
   return ground
 }
 
-/**
- * 建立环境并返回带 API 的控制器。
- * @param {import('../core/Viewer.js').Viewer} viewer
- * @returns {TimeEnvironment}
- */
+// 建立环境并返回带 API 的控制器
 export function setupEnvironment(viewer) {
   return new TimeEnvironment(viewer)
 }

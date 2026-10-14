@@ -1,9 +1,5 @@
-/**
- * 场景对象信息库
- *
- * 鼠标点选某个对象后，界面按它的模型文件（userData.source）来这里取展示信息。
- * 参数取自 Blender 端 config.py 的建模参数，和模型本身是一致的。
- */
+// 场景对象信息库：点选对象后按它的模型文件（userData.source）来这取展示信息
+// 参数取自 Blender 端 config.py 的建模参数
 export const OBJECT_INFO = {
   'pit.glb': {
     title: '基坑',
@@ -121,7 +117,7 @@ export const OBJECT_INFO = {
   },
 }
 
-/** 取展示信息：标题优先用对象自己的编号名（如「在建楼层 2 号」），便于区分同类对象 */
+// 标题优先用对象自己的编号名（如「在建楼层 2 号」），便于区分同类对象
 export function getObjectInfo(source, label) {
   const hit = OBJECT_INFO[source]
   if (hit) return { ...hit, title: label || hit.title, label }

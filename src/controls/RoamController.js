@@ -2,44 +2,29 @@ import * as THREE from 'three'
 import { Octree } from 'three/addons/math/Octree.js'
 import { Capsule } from 'three/addons/math/Capsule.js'
 
-/**
- * 第一人称漫游控制器
- *
- * 移动用「加速度 + 阻尼」而不是直接把速度设成目标值，
- * 起步和刹停都有一点惯性，走起来更像人。
- *
- * 碰撞用 three.js 自带的八叉树 + 胶囊体：
- * 把整个场地塞进 Octree，每帧拿玩家的胶囊去求交，
- * 拿到法线和穿透深度后再把胶囊推回去，顺便实现「贴着墙滑」。
- */
+// 第一人称漫游：移动用加速度+阻尼，起步刹停带惯性；碰撞用 Octree + 胶囊体，
+// 每帧求交后把胶囊推回去，顺带实现贴墙滑行
 
-/** 重力加速度，比真实值大一些，手感更跟脚 */
+// 重力加速度，比真实值大些，手感更跟脚
 const GRAVITY = 26
-/** 视点高度（米） */
+// 视点高度（米）
 const EYE_HEIGHT = 1.68
-/** 玩家碰撞胶囊半径 */
+// 碰撞胶囊半径
 const PLAYER_RADIUS = 0.35
-/** 地面 / 空中的水平加速度，空中控制力弱一些 */
+// 地面 / 空中的水平加速度，空中控制力弱
 const ACCEL_GROUND = 34
 const ACCEL_AIR = 8
-/** 按住 Shift 的冲刺倍率 */
+// 按住 Shift 的冲刺倍率
 const SPRINT_SCALE = 1.9
-/** 鼠标灵敏度（弧度/像素） */
+// 鼠标灵敏度（弧度/像素）
 const LOOK_SENSITIVITY = 0.0022
-/** 水平速度上限，防止冲刺时越跑越快 */
+// 水平速度上限，防止冲刺时越跑越快
 const MAX_HORIZONTAL_SPEED = 22
-/** 俯仰角限制，留一点余量避免万向锁 */
+// 俯仰角限制，留点余量避免万向锁
 const PITCH_LIMIT = Math.PI / 2 - 0.06
 
 export class RoamController {
-  /**
-   * @param {import('../core/Viewer.js').Viewer} viewer
-   * @param {object} options
-   * @param {THREE.Object3D} options.siteRoot 场景根节点，用来建碰撞世界
-   * @param {number[]} [options.spawn] 出生点 [x, y, z]
-   * @param {number} [options.yaw] 出生朝向（绕 Y 轴弧度，0 = 朝 -Z）
-   * @param {Function} [options.onStateChange] 状态变化回调，用来刷新界面
-   */
+  // siteRoot 用来建碰撞世界；spawn 是出生点 [x,y,z]；yaw 是出生朝向（弧度，0 朝 -Z）
   constructor(viewer, { siteRoot, spawn = [0, 0.5, 0], yaw = 0, onStateChange } = {}) {
     this.viewer = viewer
     this.camera = viewer.camera
@@ -63,7 +48,7 @@ export class RoamController {
 
     this.octree = buildCollisionWorld(viewer, siteRoot)
 
-    // 事件都存成实例属性，dispose 时才能准确移除
+    // 事件存成实例属性，dispose 时才删得干净
     this._onKeyDown = (e) => this.handleKey(e, true)
     this._onKeyUp = (e) => this.handleKey(e, false)
     this._onMouseMove = (e) => this.handleMouseMove(e)
@@ -75,19 +60,16 @@ export class RoamController {
     document.addEventListener('pointerlockchange', this._onPointerLockChange)
   }
 
-  /** 指针是否已被锁定（锁定中鼠标才不会跑出浏览器） */
+  // 指针锁定后鼠标才不会跑出浏览器
   get isLocked() {
     return document.pointerLockElement === this.domElement
   }
 
-  // ------------------------------------------------------------------
-  // 进出漫游模式
-  // ------------------------------------------------------------------
   enter() {
     if (this.active) return
     this.active = true
 
-    // 记住俯瞰视角，退出时好还原
+    // 记住俯瞰视角，退出时还原
     this.savedView = {
       position: this.camera.position.clone(),
       target: this.viewer.controls.target.clone(),
@@ -115,7 +97,7 @@ export class RoamController {
     this.onStateChange?.(this)
   }
 
-  /** 回到出生点并清空速度 */
+  // 回到出生点并清空速度
   respawn() {
     this.velocity.set(0, 0, 0)
     this.capsule.start.set(this.spawn.x, this.spawn.y + PLAYER_RADIUS, this.spawn.z)
@@ -126,7 +108,7 @@ export class RoamController {
 
   lockPointer() {
     if (this.isLocked) return
-    // 新版浏览器返回 Promise，用户按 Esc 拒绝时会 reject，这里忽略即可
+    // requestPointerLock 返回 Promise，用户按 Esc 拒绝会 reject，忽略即可
     const result = this.domElement.requestPointerLock?.()
     if (result && typeof result.catch === 'function') result.catch(() => {})
   }
@@ -135,13 +117,9 @@ export class RoamController {
     if (this.isLocked) document.exitPointerLock()
   }
 
-  // ------------------------------------------------------------------
-  // 每帧更新
-  // ------------------------------------------------------------------
   update(dt) {
     if (!this.active) return
 
-    // ---- 1. 水平方向：朝相机朝向加速 ----
     const forward = this.forwardVector()
     const right = this.rightVector()
     const sprint = this.keys.ShiftLeft || this.keys.ShiftRight ? SPRINT_SCALE : 1
@@ -152,8 +130,7 @@ export class RoamController {
     if (this.keys.KeyD || this.keys.ArrowRight) this.velocity.addScaledVector(right, accel)
     if (this.keys.KeyA || this.keys.ArrowLeft) this.velocity.addScaledVector(right, -accel)
 
-    // ---- 2. 阻尼 + 重力 ----
-    // 在地面上不再累加重力，靠阻尼把速度自然收干，避免速度无限往下堆
+    // 阻尼+重力；站在地面上不再累加重力，靠阻尼收干速度
     let damping = Math.exp(-4 * dt) - 1
     if (!this.onFloor) {
       this.velocity.y -= GRAVITY * dt
@@ -168,19 +145,17 @@ export class RoamController {
       this.velocity.z *= k
     }
 
-    // ---- 3. 位移，再用碰撞结果修正 ----
     this.capsule.translate(this.velocity.clone().multiplyScalar(dt))
     this.resolveCollisions()
 
-    // ---- 4. 相机跟随胶囊顶部 ----
     this.camera.position.copy(this.capsule.end)
     this.camera.rotation.set(this.pitch, this.yaw, 0)
 
-    // 万一掉出场地，拉回出生点
+    // 掉出场地就拉回出生点
     if (this.capsule.end.y < -30) this.respawn()
   }
 
-  /** 把胶囊推回到不穿模的位置，并更新「是否站在地上」 */
+  // 把胶囊推回不穿模的位置，并更新是否站在地上
   resolveCollisions() {
     const result = this.octree.capsuleIntersect(this.capsule)
     this.onFloor = false
@@ -189,7 +164,7 @@ export class RoamController {
     this.onFloor = result.normal.y > 0
 
     if (!this.onFloor) {
-      // 撞到墙：消掉速度在法线方向的分量 —— 这样是「贴着墙滑」而不是被弹开
+      // 撞墙时消掉速度的法向分量，实现贴墙滑行而不是被弹开
       this.velocity.addScaledVector(result.normal, -result.normal.dot(this.velocity))
     }
     if (result.depth > 1e-8) {
@@ -197,10 +172,7 @@ export class RoamController {
     }
   }
 
-  // ------------------------------------------------------------------
-  // 输入
-  // ------------------------------------------------------------------
-  /** 只取水平分量：抬头低头不应该影响走路方向 */
+  // 只取水平分量，抬头低头不影响走路方向
   forwardVector(target = new THREE.Vector3()) {
     return target.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw))
   }
@@ -213,7 +185,7 @@ export class RoamController {
     if (!this.active) return
     this.keys[event.code] = pressed
 
-    // 方向键和空格默认会滚动页面，漫游时拦掉
+    // 方向键和空格默认滚页面，漫游时拦掉
     if (pressed && (event.code === 'Space' || event.code.startsWith('Arrow'))) {
       event.preventDefault()
     }
@@ -234,20 +206,13 @@ export class RoamController {
   }
 }
 
-/**
- * 建立碰撞世界。
- *
- * 注意 Octree.fromGraphNode() 内部会直接 build 一次，重复调用会把已有的
- * 三角面分配打乱，所以这里用一个分组把「场地」和「隐形地板」包在一起，一次建完。
- *
- * 大门的两扇蓝门是开合动画件：建碰撞世界前先暂时摘下来，建完再原样挂回。
- * 否则「关门」姿态会在门口留一堵看不见的墙，把玩家永久挡在大门外。
- */
+// 建碰撞世界：把场地和隐形地板包进一个 Group，一次 fromGraphNode 建完。
+// 两扇门是动画件，先摘下来再建，免得关门姿态在门口留一堵看不见的墙
 function buildCollisionWorld(viewer, siteRoot) {
   const root = new THREE.Group()
   root.name = 'CollisionRoot'
 
-  // 摘下两扇门（只影响这一帧的碰撞烘焙，随后立刻还原）
+  // 先摘门，建完挂回
   const leaves = []
   if (siteRoot) {
     siteRoot.traverse((o) => {
@@ -260,20 +225,20 @@ function buildCollisionWorld(viewer, siteRoot) {
 
   if (siteRoot) root.add(siteRoot)
 
-  // 场地外的隐形地板：围挡有大门的缺口，防止走出去之后无限下坠
+  // 场地外的隐形地板，防止走出大门缺口后无限下坠
   const floor = new THREE.Mesh(
     new THREE.BoxGeometry(200, 2, 200),
     new THREE.MeshBasicMaterial()
   )
   floor.name = 'CollisionFloor'
   floor.visible = false
-  floor.position.y = -1.1 // 顶面落在 y = -0.1，和兜底地面齐平
+  floor.position.y = -1.1 // 顶面 y=-0.1，和兜底地面齐平
   root.add(floor)
 
   viewer.scene.add(root)
   const octree = new Octree().fromGraphNode(root)
 
-  // 门扇原样挂回（局部变换不变），渲染不受影响
+  // 门扇原样挂回，局部变换不变
   for (const { o, parent } of leaves) parent.add(o)
   return octree
 }

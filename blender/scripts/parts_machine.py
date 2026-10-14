@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
-"""机械与市政类模型（路灯 / 挖掘机 / 翻斗车 / 搅拌车）。
-
-挖掘机和卡车要做关节动画，所以按节点分层导出，前端直接转对应节点即可：
-    Excavator_Base -> _House -> _Boom -> _Stick -> _Bucket
-    DumpTruck_Base -> DumpTruck_Bed
+"""机械与市政类模型：路灯 / 挖掘机 / 翻斗车 / 搅拌车。
+挖掘机和卡车按节点分层导出，前端直接转对应节点即可。
 """
 
 import math
@@ -116,7 +113,7 @@ def build_excavator(collection=None):
     house.cylinder(0.16, 0.55, (-0.05, 0.72, 1.60), mat=dark, segments=10)  # 空滤
     house.cylinder(0.07, 0.40, (0.42, 0.80, 1.80), mat=gray, segments=8)    # 排气尾管
 
-    # 配重，带上斜面和吊装孔
+    # 配重，带斜面和吊装孔
     house.box((0.75, 2.10, 1.05), (-2.00, 0.0, 0.63), mat=dark)
     house.box((0.42, 1.82, 0.30), (-2.20, 0.0, 1.20), mat=dark)
     house.box((0.22, 0.30, 0.18), (-1.92, 0.0, 1.32), mat=gray)
@@ -248,7 +245,7 @@ def build_excavator(collection=None):
     return base_obj
 
 
-# 卡车驾驶室：前脸朝 +X，ch 是底盘上平面标高，w 是车宽
+# 卡车驾驶室：前脸朝 +X，ch 为底盘上平面标高，w 为车宽
 def _truck_cab(base, ch, w, body="machine_yellow", dark="machine_dark",
                gray="steel_gray"):
     cab_cx = 3.15
@@ -375,7 +372,7 @@ def _truck_cab(base, ch, w, body="machine_yellow", dark="machine_dark",
 
 
 # 水泥搅拌车（正面朝 +X）。搅拌筒是独立节点 Mixer_Drum，
-# 局部 Z 轴就是自转轴，前端绕 rotation.z 旋转即可。
+# 局部 Z 轴为自转轴，前端绕 rotation.z 旋转即可。
 def build_mixer_truck(collection=None):
     body = "machine_yellow"
     dark = "machine_dark"

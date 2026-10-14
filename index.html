@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>基于数字孪生的建筑工地三维可视化管控系统</title>
     <link rel="stylesheet" href="./src/style.css" />
-    <!--
-      用 Live Server 直接打开时必须靠 importmap 解析裸模块名，
-      把 three 与 three/addons/ 指向本地 node_modules。
-    -->
+    <!-- 用 Live Server 打开时靠 importmap 解析裸模块名 -->
     <script type="importmap">
       {
         "imports": {
@@ -25,7 +22,7 @@
       <!-- 漫游准星 -->
       <div id="crosshair" class="crosshair" hidden></div>
 
-      <!-- 顶部标题条（细） -->
+      <!-- 顶部标题条 -->
       <header class="hud hud-top">
         <div class="brand">
           <span class="brand-dot"></span>
@@ -34,18 +31,17 @@
         <p id="hud-status">正在初始化…</p>
       </header>
 
-      <!-- 顶部居中：风险告警条（有风险时出现） -->
+      <!-- 风险告警条（有风险时出现） -->
       <div id="risk-banner" class="risk-banner" hidden></div>
 
-      <!-- 右侧统一控制面板：按使用频率自上而下排列
-           时间环境 / 视角切换 / 塔吊 / 设备动画 / 大门 / 车辆灯光 / 风险模拟 / 场景对象 -->
+      <!-- 右侧控制面板：自上而下分区，标题可折叠 -->
       <aside class="hud hud-panel" id="side-panel">
-        <!-- 面板操作：一键把整个应用状态恢复默认 -->
+        <!-- 一键恢复默认 -->
         <div class="panel-actions">
           <button type="button" id="btn-reset" class="reset-btn">恢复默认</button>
         </div>
 
-        <!-- 1. 时间环境（4 个时刻预设 + 时钟 / 温度状态行） -->
+        <!-- 时间环境 -->
         <section class="panel-section">
           <button type="button" class="section-head" data-section="time" aria-expanded="true">
             <span class="section-head-label">时间环境</span>
@@ -57,7 +53,7 @@
           </div>
         </section>
 
-        <!-- 2. 视角切换 -->
+        <!-- 视角切换 -->
         <section class="panel-section">
           <button type="button" class="section-head" data-section="views" aria-expanded="true">
             <span class="section-head-label">视角切换</span>
@@ -72,7 +68,7 @@
           </div>
         </section>
 
-        <!-- 3. 塔吊（回转 + 小车变幅 + 吊钩升降，三个动作各有速度倍率） -->
+        <!-- 塔吊 -->
         <section class="panel-section" id="crane-panel">
           <button type="button" class="section-head" data-section="crane" aria-expanded="true">
             <span class="section-head-label">塔吊</span>
@@ -117,7 +113,7 @@
           </div>
         </section>
 
-        <!-- 4. 设备动画（每台机械独立开关 + 独立速度，可多台同时动作） -->
+        <!-- 设备动画 -->
         <section class="panel-section" id="anim-panel">
           <button type="button" class="section-head" data-section="machines" aria-expanded="true">
             <span class="section-head-label">设备动画</span>
@@ -128,7 +124,7 @@
           </div>
         </section>
 
-        <!-- 5. 大门（两扇蓝色门扇对开：开 / 关 + 开合速度） -->
+        <!-- 大门 -->
         <section class="panel-section" id="gate-panel">
           <button type="button" class="section-head" data-section="gate" aria-expanded="true">
             <span class="section-head-label">大门</span>
@@ -147,7 +143,7 @@
           </div>
         </section>
 
-        <!-- 6. 车辆灯光（作业车辆总开关） -->
+        <!-- 车辆灯光 -->
         <section class="panel-section">
           <button type="button" class="section-head" data-section="vehicle" aria-expanded="true">
             <span class="section-head-label">车辆灯光</span>
@@ -160,7 +156,7 @@
           </div>
         </section>
 
-        <!-- 7. 人员（实时在场人数 / 分区分布 / 气温 / 风险状态；运行时按 worker.glb 生成） -->
+        <!-- 人员 -->
         <section class="panel-section" id="people-panel">
           <button type="button" class="section-head" data-section="people" aria-expanded="true">
             <span class="section-head-label">人员</span>
@@ -179,7 +175,7 @@
           </div>
         </section>
 
-        <!-- 8. 风险模拟 + 处置措施 -->
+        <!-- 风险模拟 + 处置措施 -->
         <section class="panel-section">
           <button type="button" class="section-head" data-section="risks" aria-expanded="true">
             <span class="section-head-label">风险模拟</span>
@@ -194,7 +190,7 @@
           </div>
         </section>
 
-        <!-- 9. 场景对象（默认折叠，展开后跟随整面板滚动） -->
+        <!-- 场景对象（默认折叠） -->
         <section class="panel-section">
           <button type="button" class="section-head is-collapsed" data-section="objects" aria-expanded="false">
             <span class="section-head-label">场景对象</span>
@@ -206,7 +202,7 @@
         </section>
       </aside>
 
-      <!-- 点选对象信息卡（左下，不与右侧面板重叠） -->
+      <!-- 点选对象信息卡（左下） -->
       <aside class="hud hud-info" id="info-card" hidden>
         <button type="button" id="info-close" class="info-close" aria-label="关闭">×</button>
         <div class="info-head">
@@ -221,7 +217,7 @@
         <p id="hint-text">左键拖拽 旋转　滚轮 缩放　右键拖拽 平移</p>
       </div>
 
-      <!-- 漫游暂停遮罩：指针锁定被 Esc 打断后出现 -->
+      <!-- 漫游暂停遮罩：Esc 打断指针锁定后出现 -->
       <div id="roam-overlay" class="roam-overlay" hidden>
         <div class="roam-overlay-box">
           <p class="roam-overlay-title">漫游已暂停</p>

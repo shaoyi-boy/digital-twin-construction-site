@@ -1,38 +1,15 @@
 import * as THREE from 'three'
 import { ZONES, zoneByKey } from './zones.js'
 
-/**
- * 风险模拟（失火 / 断电 / 机械故障）+ 处置措施
- *
- * 三种风险可同时开启，每一种都在三维场景里生成真实效果，关闭时把现场还原到
- * 开启前完全一致，不留任何残留网格 / 材质。所有动效由主循环驱动
- * （main.js 里 viewer.onUpdate(dt => risks.update(dt))）。
- *
- *   失火     —— 从「仓库内」起火，火势按可燃油料路径向「材料堆场 / 钢筋加工区」
- *              「主体结构楼层内（脚手架密目安全网）」蔓延；每个起火分区独立拥有
- *              火焰、烟雾、烟柱、地面火场警戒环与闪烁火光；火势抬升该分区温度。
- *   断电     —— 沿围墙的四排路灯按 东 → 南 → 西 → 北 逐排熄灭（分区渐进式停电），
- *              全灭后应急灯自动亮起，环境照明同步下调。
- *   机械故障 —— 挖掘机 1 号停机冻结，机顶亮红色报警信标、发动机冒蒸汽，
- *              机旁立「检修中」标志牌并布设警戒锥。
- *
- * 处置措施（可手动触发，失火时也会自动依次展开）：
- *   启动应急预案 / 广播疏散 / 消防灭火 / 切断电源 / 警戒隔离
- *   其中「消防灭火」会在火场生成水枪水柱与蒸汽，先抑制蔓延再让明火逐步衰减熄灭；
- *  「切断电源」与断电风险共用同一套停电效果；「警戒隔离」在火场四周摆警戒锥。
- *
- * 人员联动所需的数据接口：
- *   hazardZones  —— 当前受影响的分区 key 列表（火场分区 / 全场断电 / 故障机械所在分区）
- *   fireZones    —— 正在燃烧的分区及其火势强度（供温度联动）
- *   fireHeat     —— 火场热浪总强度（0~1，供环境曝光 / 雾色叠加）
- */
+// 风险模拟（失火 / 断电 / 机械故障）与处置措施，动效由主循环 update(dt) 驱动。
+// 风险可同时开，关掉时把现场还原到开启前，不留残留网格或材质。
 
-// —— 与 SiteBuilder 生成的对象一致的标识 ——
+// 路灯标识，要和 SiteBuilder 生成的对象一致
 const LAMP_SOURCE = 'lamp_post.glb'
 const LAMP_LABEL = '路灯'
 const LAMP_MATERIAL = 'lamp_white'
 
-// —— 需要停机的机械（Machines 里的 label）与其所在作业分区 ——
+// 要停机的机械（Machines 里的 label）和它所在分区
 const MACHINE_LABEL = '挖掘机 1 号（作业）'
 const MACHINE_ZONE = 'material'
 
@@ -50,30 +27,24 @@ const MEASURE_DEFS = [
   { key: 'cordon', label: '警戒隔离' },
 ]
 
-/** 火势蔓延路径：仓库（起火点）→ 材料堆场 → 塔吊作业区 → 主体结构（脚手架安全网） */
+// 蔓延顺序：仓库(起火点)→材料堆场→塔吊区→主体结构
 const FIRE_CHAIN = ['warehouse', 'material', 'crane', 'structure']
-/** 相邻分区被引燃的间隔（秒，未受处置影响时） */
+// 相邻分区引燃间隔，秒（没受处置影响时）
 const FIRE_INTERVAL = 6
-/** 起燃后火势建立到满强度的时间（秒） */
+// 火势从起燃到满强度的时间，秒
 const FIRE_RAMP = 4
-/** 处置后火势衰减速率（每秒） */
+// 火势衰减速率，每秒
 const FIRE_DECAY = 0.075
-/** 水枪启动后多久明火停止蔓延（秒） */
+// 水枪启动后多久明火停止蔓延，秒
 const SPRAY_STOP_AFTER = 3
-/** 断电渐进式：四排路灯逐排熄灭，一排间隔（秒） */
+// 四排路灯逐排熄灭，每排间隔，秒
 const REGION_INTERVAL = 1.0
-/** 单个火场分区升温上限（°C），乘火势强度得到该分区升幅 */
+// 单个火场分区升温上限 °C，乘火势强度得升幅
 const FIRE_HEAT_PER_ZONE = 45
 
 const LAMP_REGION_ORDER = ['east', 'south', 'west', 'north']
 
 export class Risks {
-  /**
-   * @param {import('../core/Viewer.js').Viewer} viewer
-   * @param {object} options
-   * @param {THREE.Object3D} options.root 场地根节点（SiteRoot），用来找路灯
-   * @param {import('./Machines.js').Machines} options.machines 机械动画管理器
-   */
   constructor(viewer, { root, machines } = {}) {
     this.viewer = viewer
     this.root = root
@@ -81,39 +52,39 @@ export class Risks {
 
     this.time = 0
     this.activeMap = { fire: false, power: false, machine: false }
-    /** key -> { update(dt), dispose(), meshCount } */
+    // key -> { update, dispose, meshCount }
     this.effects = new Map()
-    /** 面板状态文案 */
+    // 面板状态文案
     this.notes = { fire: '', power: '', machine: '' }
-    /** 每种风险开启时新增的网格数（供调试 / 校验） */
+    // 每种风险新增的网格数，调试用
     this.stats = { fire: 0, power: 0, machine: 0 }
 
-    /** 处置措施状态 */
+    // 处置措施状态
     this.measureMap = new Map(MEASURE_DEFS.map((d) => [d.key, { ...d, active: false }]))
 
-    // —— 失火运行时数据 ——
+    // 失火运行时数据
     this._fire = null
-    /** 每个起火分区的可视化记录：key -> { zone, group, intensity, ... } */
+    // key -> 起火分区的可视化记录
     this._fireVisuals = new Map()
-    /** 火势蔓延记录：[{ key, label, at }]（at 为点燃时刻，秒） */
+    // 蔓延记录，at 是点燃时刻，秒
     this.spreadLog = []
-    /** 当前火场分区快照：[{ key, label, intensity }] */
+    // 当前火场分区快照
     this.fireZones = []
     this._fireHeatTotal = 0
 
-    // —— 断电（风险 + 处置共用）——
+    // 断电，风险和处置共用
     this._powerFx = null
 
-    // —— 机械故障 ——
+    // 机械故障
     this._machineFx = null
 
-    /** 失火时自动依次展开处置措施的计时 / 已展开集合 */
+    // 自动展开处置措施的计时与已展开集合
     this._fireElapsed = 0
     this._autoApplied = new Set()
     this.fireExtinguished = false
   }
 
-  /** 面板用：风险清单 */
+  // 面板：风险清单
   get list() {
     return RISK_DEFS.map((d) => ({
       key: d.key,
@@ -122,7 +93,7 @@ export class Risks {
     }))
   }
 
-  /** 面板用：处置措施清单 */
+  // 面板：处置措施清单
   get measures() {
     return MEASURE_DEFS.map((d) => ({ key: d.key, label: d.label, active: this.measureMap.get(d.key).active }))
   }
@@ -131,7 +102,7 @@ export class Risks {
     return RISK_DEFS.some((d) => this.activeMap[d.key])
   }
 
-  /** 面板状态行：列出当前激活风险 / 处置说明，没有则提示正常 */
+  // 面板状态行：当前激活的风险和处置说明
   get statusText() {
     const parts = RISK_DEFS.filter((d) => this.activeMap[d.key])
       .map((d) => this.notes[d.key])
@@ -143,10 +114,7 @@ export class Risks {
     return seg.length ? seg.join('　|　') : '当前无风险，工地运行正常'
   }
 
-  // ------------------------------------------------------------------
-  // 人员 / 温度联动数据
-  // ------------------------------------------------------------------
-  /** 当前受影响分区（火场分区 / 全场断电 / 故障机械所在分区） */
+  // 当前受影响的分区 key 列表（火场 / 全场断电 / 故障机械分区）
   get hazardZones() {
     const set = new Set()
     if (this.activeMap.fire) {
@@ -157,27 +125,25 @@ export class Risks {
     return [...set]
   }
 
-  /** 火场热浪总强度（0~1），供环境曝光 / 雾色叠加 */
+  // 火场热浪总强度 0~1，供曝光 / 雾色叠加
   get fireHeat() {
     return Math.min(1, this._fireHeatTotal * 0.4)
   }
 
-  /** 各分区因火场升高的温度（°C）：{ zoneKey: 升幅 } */
+  // 各分区因火升高的温度 °C：{ zoneKey: 升幅 }
   get zoneHeat() {
     const m = {}
     for (const z of this.fireZones) m[z.key] = z.intensity * FIRE_HEAT_PER_ZONE
     return m
   }
 
-  /** 面板 / 验证用：火势蔓延明细 */
+  // 火势蔓延明细
   get spread() {
     return this.spreadLog.map((s) => ({ ...s }))
   }
 
-  // ------------------------------------------------------------------
   // 风险开关
-  // ------------------------------------------------------------------
-  /** 开关某个风险，返回切换后的状态 */
+  // 切换某个风险，返回切换后的状态
   toggle(kind) {
     if (!(kind in this.activeMap)) return false
     if (this.activeMap[kind]) this._deactivate(kind)
@@ -185,7 +151,7 @@ export class Risks {
     return this.activeMap[kind]
   }
 
-  /** 全部解除：风险 + 处置措施一起复位，现场完全还原 */
+  // 全部解除：风险 + 处置措施一起复位，现场还原
   clear() {
     for (const { key } of RISK_DEFS) {
       if (this.activeMap[key]) this._deactivate(key)
@@ -200,10 +166,8 @@ export class Risks {
     this._reconcilePower()
   }
 
-  // ------------------------------------------------------------------
   // 处置措施
-  // ------------------------------------------------------------------
-  /** 开关某个处置措施，返回切换后的状态 */
+  // 切换某个处置措施，返回切换后的状态
   toggleMeasure(key) {
     const m = this.measureMap.get(key)
     if (!m) return false
@@ -224,7 +188,7 @@ export class Risks {
     if (key === 'cordon') this._clearZoneAttachments('cordon')
   }
 
-  /** 清除所有火场分区上挂载的某类处置附件 */
+  // 清掉火场分区上挂载的某类处置附件
   _clearZoneAttachments(kind) {
     for (const v of this._fireVisuals.values()) {
       const a = v[kind]
@@ -236,26 +200,22 @@ export class Risks {
     }
   }
 
-  // ------------------------------------------------------------------
   // 主循环
-  // ------------------------------------------------------------------
   update(dt) {
     this.time += dt
     for (const fx of this.effects.values()) fx.update?.(dt)
 
     if (this.activeMap.fire) this._updateFire(dt)
 
-    // 断电风险与「切断电源」处置共用一套停电效果，每帧对账
+    // 断电和「切断电源」共用一套停电效果，每帧对账
     this._reconcilePower()
   }
 
-  // ------------------------------------------------------------------
-  // 内部：开启 / 关闭
-  // ------------------------------------------------------------------
+  // 开启 / 关闭
   _activate(kind) {
     if (this.activeMap[kind]) return
     if (kind === 'power') {
-      // 断电效果由 _reconcilePower 创建，这里只翻状态
+      // 断电效果由 _reconcilePower 建，这里只翻状态
       this.activeMap.power = true
       this._reconcilePower()
       return
@@ -279,15 +239,13 @@ export class Risks {
       fx.dispose?.()
       this.effects.delete(kind)
     }
-    // 失火解除时，把由火灾自动展开的处置措施一并撤销（手动开启的保留），
-    // 这样风险一解除，人员就能回到各自岗位。
+    // 解除失火时撤销自动展开的处置，手动开启的保留
     if (kind === 'fire') this._standDownFireMeasures()
     this.activeMap[kind] = false
     this.stats[kind] = 0
     this.notes[kind] = ''
   }
 
-  /** 撤销失火自动展开的处置措施 */
   _standDownFireMeasures() {
     for (const key of ['plan', 'evac', 'cordon', 'spray', 'powercut']) {
       if (!this._autoApplied.has(key)) continue
@@ -301,9 +259,7 @@ export class Risks {
     this._reconcilePower()
   }
 
-  // ==================================================================
-  // 失火：真实蔓延 + 处置
-  // ==================================================================
+  // 失火
   _createFire() {
     const self = this
     this._fireHeatTotal = 0
@@ -319,13 +275,13 @@ export class Risks {
     this.notes.fire = `失火：${zoneByKey(FIRE_CHAIN[0])?.label || '仓库内'} 起火`
 
     return {
-      meshCount: 0, // 分区可动态增加，网格数按需统计
+      meshCount: 0, // 分区会动态增加，网格数按需统计
       update: (dt) => { this._autoFireMeasures(dt) },
       dispose: () => this._disposeFire(),
     }
   }
 
-  /** 失火后自动依次展开处置措施（预案 7s → 疏散 11s → 警戒 15s → 灭火 19s → 断电 23s） */
+  // 失火后自动展开处置的时刻，秒：7 / 11 / 15 / 19 / 23
   _autoFireMeasures(dt) {
     this._fireElapsed += dt
     const schedule = [
@@ -355,7 +311,7 @@ export class Risks {
     const sprayActive = this.measureMap.get('spray').active
     const planActive = this.measureMap.get('plan').active
     if (!f.extinguished) {
-      // 蔓延：水枪一开就停；应急预案把蔓延速度压到 0.6×
+      // 水枪一开就停蔓延；预案把速度压到 0.6×
       const factor = sprayActive ? 0 : planActive ? 0.6 : 1
       if (!f.stopped) {
         f.since += dt * factor
@@ -374,7 +330,7 @@ export class Risks {
       }
     }
 
-    // 逐分区推进火势强度并刷新视觉
+    // 逐分区推进火势并刷新视觉
     const extinguishing = f.stopped || sprayActive
     let total = 0
     for (const [key, v] of this._fireVisuals) {
@@ -404,14 +360,14 @@ export class Risks {
     this.stats.fire = this._countFireMeshes()
   }
 
-  /** 点燃一个分区：建立该分区的火焰 / 烟雾 / 烟雾柱 / 警戒环 / 火光 */
+  // 点燃分区：建火焰 / 烟雾 / 烟柱 / 警戒环 / 火光
   _igniteZone(key) {
     const zone = zoneByKey(key)
     if (!zone || this._fireVisuals.has(key)) return
     const v = buildZoneFire(zone, this.viewer.scene)
     this._fireVisuals.set(key, v)
     this.spreadLog.push({ key, label: zone.label, at: Number(this.time.toFixed(2)) })
-    // 蔓延导致的状态文案
+    // 蔓延时刷新状态文案
     if (this.spreadLog.length > 1) {
       const chain = this.spreadLog.map((s) => s.label).join(' → ')
       this.notes.fire = `失火蔓延：${chain}（第 ${this.spreadLog.length} 个分区）`
@@ -427,7 +383,7 @@ export class Risks {
     return n
   }
 
-  /** 每帧确保火场分区上按处置措施状态挂好水枪（spray）与警戒锥（cordon） */
+  // 每帧按处置状态挂好水枪和警戒锥
   _updateZoneAttachments(key, v) {
     const sprayOn = this.measureMap.get('spray').active
     const cordonOn = this.measureMap.get('cordon').active
@@ -462,15 +418,13 @@ export class Risks {
     this.notes.fire = ''
   }
 
-  // ==================================================================
-  // 断电：分区渐进式停电 + 应急灯
-  // ==================================================================
-  /** 断电风险与「切断电源」处置任一开启，就需要停电效果 */
+  // 断电
+  // 断电风险和切断电源任一开启就需要停电效果
   _wantPower() {
     return this.activeMap.power || this.measureMap.get('powercut').active
   }
 
-  /** 按需求创建 / 销毁停电效果（幂等） */
+  // 按需创建 / 销毁停电效果（幂等）
   _reconcilePower() {
     const want = this._wantPower()
     if (want && !this._powerFx) {
@@ -489,7 +443,7 @@ export class Risks {
   }
 
   _createBlackout() {
-    // 1. 收集沿围墙布置的所有路灯，并按所处方位归入四排
+    // 1. 收集路灯，按方位归入四排
     const regions = { east: [], south: [], west: [], north: [] }
     this.root?.traverse((o) => {
       if (o.name === LAMP_LABEL && o.userData?.source === LAMP_SOURCE) {
@@ -498,7 +452,7 @@ export class Risks {
     })
     const lampCount = LAMP_REGION_ORDER.reduce((n, r) => n + regions[r].length, 0)
 
-    // 2. 逐盏把灯头发光材质换成克隆体（初始仍亮着，运行时按排渐进熄灭）
+    // 2. 灯头材质换克隆体，初始仍亮，运行时按排熄灭
     const restoreMeshes = []
     const cloned = []
     const clonedByRegion = { east: [], south: [], west: [], north: [] }
@@ -526,7 +480,7 @@ export class Risks {
       }
     }
 
-    // 3. 环境照明记录原值，停电时整体压低
+    // 3. 记录环境照明原值，停电时压低
     const lightRestore = []
     this.viewer.scene.traverse((o) => {
       if (o.isHemisphereLight || o.isAmbientLight) {
@@ -534,7 +488,7 @@ export class Risks {
       }
     })
 
-    // 4. 应急灯：门卫室 / 办公房 / 仓库 / 生活区大门等关键点位各一盏冷白灯
+    // 4. 应急灯：几个关键点位各一盏冷白灯
     const emgGroup = new THREE.Group()
     emgGroup.name = 'EmergencyLights'
     this.viewer.scene.add(emgGroup)
@@ -555,7 +509,7 @@ export class Risks {
       lampCount,
       update: (dt) => {
         progress = Math.min(1, progress + dt / (REGION_INTERVAL * LAMP_REGION_ORDER.length))
-        // 每一排在各自时间片内熄灭
+        // 各排在各自时间片内熄灭
         LAMP_REGION_ORDER.forEach((region, i) => {
           const phase = Math.min(1, Math.max(0, progress * LAMP_REGION_ORDER.length - i))
           for (const c of clonedByRegion[region]) {
@@ -563,7 +517,7 @@ export class Risks {
             c.emissiveIntensity = 1 - phase
           }
         })
-        // 环境照明随进度下调到 45%
+        // 环境照明随进度降到 45%
         for (const l of lightRestore) l.light.intensity = l.intensity * (1 - 0.55 * progress)
         // 全灭后应急灯亮起，带轻微闪烁
         const em = Math.max(0, (progress - 0.75) / 0.25)
@@ -579,9 +533,7 @@ export class Risks {
     }
   }
 
-  // ==================================================================
-  // 机械故障：停机 + 报警信标 + 蒸汽 + 检修中标志 + 警戒锥
-  // ==================================================================
+  // 机械故障
   _createMachine() {
     const rig = this.machines?.rigs?.find((r) => r.label === MACHINE_LABEL)
     if (!rig) {
@@ -600,7 +552,7 @@ export class Risks {
     const disposables = []
     let meshCount = 0
 
-    // ---- 机顶红色闪烁信标 ----
+    // 机顶红色闪烁信标
     const beaconGroup = new THREE.Group()
     const topWorld = new THREE.Vector3(center.x, box.max.y + 0.9, center.z)
     beaconGroup.position.copy(rootObj.worldToLocal(topWorld.clone()))
@@ -615,7 +567,7 @@ export class Risks {
     const beaconLight = new THREE.PointLight(0xff2b1f, 0, 16, 2)
     beaconGroup.add(beaconLight)
 
-    // ---- 发动机处灰白蒸汽 ----
+    // 发动机处灰白蒸汽
     const steamGroup = new THREE.Group()
     const engineWorld = new THREE.Vector3(center.x, box.min.y + 1.5, center.z)
     steamGroup.position.copy(rootObj.worldToLocal(engineWorld.clone()))
@@ -640,7 +592,7 @@ export class Risks {
       })
     }
 
-    // ---- 机旁「检修中」标志牌 + 警戒锥（世界坐标，随机械位置就近摆放） ----
+    // 机旁「检修中」牌 + 警戒锥，直接用世界坐标摆放
     const marker = new THREE.Group()
     marker.name = 'MachineFaultMarker'
     this.viewer.scene.add(marker)
@@ -697,11 +649,9 @@ export class Risks {
   }
 }
 
-// ==================================================================
 // 火场分区可视化
-// ==================================================================
 
-/** 分区的外接矩形（用于摆放火焰 / 警戒环 / 水枪的范围） */
+// 分区外接矩形，用来定火焰 / 警戒环 / 水枪的范围
 function zoneExtent(zone) {
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
   for (const [cx, cz, hx, hz] of zone.rects) {
@@ -716,7 +666,7 @@ function zoneExtent(zone) {
   }
 }
 
-/** 建立一个起火分区的全部可视化对象 */
+// 建一个起火分区的全部可视化对象
 function buildZoneFire(zone, scene) {
   const ext = zoneExtent(zone)
   const radius = Math.min(9, Math.max(2.6, Math.min(ext.hx, ext.hz) * 0.6))
@@ -780,7 +730,7 @@ function buildZoneFire(zone, scene) {
   plume.position.set(0, 6.2, 0)
   group.add(plume)
 
-  // 地面火场警戒环（半径随分区大小）
+  // 地面警戒环，半径随分区大小
   const ringGeo = new THREE.RingGeometry(radius * 0.75, radius * 1.35, 40)
   const ringMat = new THREE.MeshBasicMaterial({
     color: 0xff2b1f, transparent: true, opacity: 0.5, side: THREE.DoubleSide,
@@ -803,7 +753,7 @@ function buildZoneFire(zone, scene) {
   }
 }
 
-/** 每帧推进某个分区的火势视觉（intensity 为 0~1 的火势强度） */
+// 每帧推进分区火势视觉，intensity 是 0~1 的火势强度
 function animateZoneFire(v, t, dt, extinguishing) {
   const k = v.intensity
   for (const f of v.flames) {
@@ -834,11 +784,9 @@ function animateZoneFire(v, t, dt, extinguishing) {
   v.ring.scale.setScalar(0.9 + 0.1 * k)
 }
 
-// ==================================================================
-// 处置附件：水枪（spray）、警戒锥（cordon）
-// ==================================================================
+// 处置附件：水枪 / 警戒锥
 
-/** 消防灭火：在分区火场上方架几股水柱 + 落地点蒸汽 */
+// 灭火：火场上空架几股水柱 + 落地点蒸汽
 function buildSpray(zone, group) {
   const ext = zoneExtent(zone)
   const radius = Math.min(9, Math.max(2.6, Math.min(ext.hx, ext.hz) * 0.6))
@@ -894,7 +842,7 @@ function animateSpray(spray, t) {
   }
 }
 
-/** 警戒隔离：沿分区火场外圈摆一圈警戒锥 */
+// 警戒隔离：沿火场外圈摆一圈警戒锥
 function buildCordon(zone, group) {
   const ext = zoneExtent(zone)
   const radius = Math.min(9, Math.max(2.6, Math.min(ext.hx, ext.hz) * 0.6)) * 1.5
@@ -916,11 +864,9 @@ function buildCordon(zone, group) {
   return { group: g, disposables }
 }
 
-// ==================================================================
 // 小工具
-// ==================================================================
 
-/** 「检修中」立牌：一根杆 + 一块带文字的画板（CanvasTexture） */
+// 「检修中」立牌：一根杆 + 一块画板（CanvasTexture）
 function buildSign(text, color) {
   const parts = []
   const group = new THREE.Group()
@@ -961,13 +907,13 @@ function buildSign(text, color) {
   return { group, parts, texture: tex }
 }
 
-/** 路灯所在方位（用于断电时按排渐进熄灭） */
+// 路灯所在方位，断电按排熄灭用
 function lampRegion(p) {
   if (Math.abs(p.x) > Math.abs(p.z)) return p.x > 0 ? 'east' : 'west'
   return p.z > 0 ? 'south' : 'north'
 }
 
-/** 字符串 → 稳定整数种子 */
+// 字符串 → 稳定整数种子
 function hashKey(str) {
   let h = 2166136261
   for (let i = 0; i < str.length; i += 1) {
@@ -977,7 +923,7 @@ function hashKey(str) {
   return h >>> 0
 }
 
-/** 固定种子的伪随机 */
+// 固定种子的伪随机
 function mulberry32(seed) {
   let a = seed >>> 0
   return function rand() {

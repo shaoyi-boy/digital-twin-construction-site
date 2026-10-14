@@ -1,7 +1,4 @@
-/* ============================================================
-   建筑工地数字孪生可视化平台 —— 界面样式
-   三维场景铺满全屏，UI 以半透明面板浮在上面
-   ============================================================ */
+/* 建筑工地数字孪生：界面样式，三维铺满全屏，UI 浮在上面 */
 
 :root {
   --panel-bg: rgba(12, 22, 36, 0.72);
@@ -12,7 +9,7 @@
   --brand: #4d8bff;
   --danger: #e0453a;
   --radius: 10px;
-  /* 面板内的统一竖向间距：按钮栅格行距、分区标题与内容的间距都用它 */
+  /* 面板统一竖向间距 */
   --panel-gap: 5px;
 }
 
@@ -42,7 +39,7 @@ body {
   height: 100%;
 }
 
-/* ---------------- HUD 公共 ---------------- */
+/* HUD 公共 */
 .hud {
   position: absolute;
   z-index: 10;
@@ -60,7 +57,7 @@ body {
   font-weight: 600;
 }
 
-/* ---------------- 顶部标题条（细） ---------------- */
+/* 顶部标题条 */
 .hud-top {
   top: 14px;
   left: 14px;
@@ -96,9 +93,7 @@ body {
   line-height: 1.4;
 }
 
-/* ============================================================
-   右侧统一面板：自上而下的分区栈，内容溢出时整体平滑滚动
-   ============================================================ */
+/* 右侧面板：自上而下分区，内容多时整体滚动 */
 .hud-panel {
   top: 14px;
   right: 14px;
@@ -113,9 +108,9 @@ body {
   scroll-behavior: smooth;
   scrollbar-width: thin;
   scrollbar-color: rgba(120, 190, 255, 0.35) transparent;
-  /* .hud 默认不吃鼠标事件，面板里的控件要单独放开 */
+  /* .hud 默认不吃鼠标事件，这里要放开 */
   pointer-events: auto;
-  /* 必须盖在漫游暂停遮罩（z-index:30）上面，否则暂停时点不到「俯瞰」退不出去 */
+  /* 必须盖住暂停遮罩(z-index:30)，否则点不到「俯瞰」 */
   z-index: 40;
 }
 
@@ -139,7 +134,7 @@ body {
 /* 分区 */
 .panel-section {
   flex: none;
-  /* 标题上下的间距都等于按钮行距（--panel-gap），保证各分区节奏一致 */
+  /* 上下间距等于按钮行距，各分区节奏一致 */
   padding: var(--panel-gap) 11px calc(var(--panel-gap) + 2px);
   border-bottom: 1px solid rgba(120, 190, 255, 0.12);
 }
@@ -152,7 +147,7 @@ body {
   display: none;
 }
 
-/* 分区标题（可点击折叠）：上间距 = 下间距 = 按钮行距（--panel-gap） */
+/* 分区标题，点击折叠 */
 .section-head {
   display: flex;
   align-items: center;
@@ -216,7 +211,7 @@ body {
   transform: rotate(-90deg);
 }
 
-/* 分区内容：统一竖向节奏，所有控件行间距都等于 --panel-gap */
+/* 分区内容 */
 .section-body {
   display: flex;
   flex-direction: column;
@@ -227,7 +222,7 @@ body {
   display: none;
 }
 
-/* 面板操作区：恢复默认按钮 */
+/* 恢复默认按钮 */
 .panel-actions {
   flex: none;
   padding: 8px 11px;
@@ -265,7 +260,7 @@ body {
   gap: var(--panel-gap);
 }
 
-/* 单列按钮栅格：车辆灯光这类独占一行的开关 */
+/* 单列栅格，独占一行的开关用 */
 .btn-grid.single {
   grid-template-columns: 1fr;
 }
@@ -276,7 +271,7 @@ body {
   gap: 5px;
 }
 
-/* ---------------- 通用小按钮 ---------------- */
+/* 通用小按钮 */
 .tool-btn {
   padding: 5px 6px;
   border: 1px solid rgba(120, 190, 255, 0.35);
@@ -307,7 +302,7 @@ body {
   font-weight: 600;
 }
 
-/* ---------------- 俯瞰 / 漫游 模式按钮 ---------------- */
+/* 俯瞰 / 漫游 模式按钮 */
 .mode-btn {
   padding: 6px 8px;
   border: 1px solid rgba(120, 190, 255, 0.35);
@@ -332,7 +327,7 @@ body {
   font-weight: 600;
 }
 
-/* ---------------- 时间环境 ---------------- */
+/* 时间环境 */
 .time-status {
   margin: 0;
   font-size: 10.5px;
@@ -341,7 +336,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------------- 设备动画（每台一行：按钮 + 该台的速度倍率） ---------------- */
+/* 设备动画：每台一行，按钮 + 速度倍率 */
 .anim-list {
   display: flex;
   flex-direction: column;
@@ -354,13 +349,13 @@ body {
   gap: var(--panel-gap);
 }
 
-/* 行内速度条不要额外上下边距，保持与分区标题一致的紧凑节奏 */
+/* 行内速度条不要上下边距 */
 .anim-item .crane-row {
   margin: 0;
 }
 
-/* ---------------- 塔吊 / 设备速度行（标签 + 滑块 + 数值） ---------------- */
-/* [标签] [滑块] [数值]：标签定宽左对齐，保证各行的滑块与按钮竖向对齐成一列 */
+/* 速度行：标签 + 滑块 + 数值 */
+/* 标签定宽左对齐，各行滑块竖向对齐成一列 */
 .crane-row {
   display: grid;
   grid-template-columns: 52px 1fr auto;
@@ -385,7 +380,7 @@ body {
 
 .crane-range {
   width: 100%;
-  min-width: 64px; /* 保证一个可触达的最小拖动宽度 */
+  min-width: 64px; /* 最小可拖动宽度 */
   height: 3px;
   margin: 0;
   appearance: none;
@@ -426,7 +421,7 @@ body {
   opacity: 0.55;
 }
 
-/* ---------------- 风险模拟 ---------------- */
+/* 风险模拟 */
 .risk-btn.is-active {
   color: #fff;
   background: var(--danger);
@@ -474,7 +469,7 @@ body {
   font-weight: 600;
 }
 
-/* ---------------- 人员（实时在场人数 / 分区分布 / 气温 / 风险状态） ---------------- */
+/* 人员 */
 .people-summary {
   margin: 0;
   font-size: 11px;
@@ -554,7 +549,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------------- 场景对象（标题可折叠，展开后随整面板一起滚动，无嵌套滚动） ---------------- */
+/* 场景对象：标题可折叠，展开后随整面板滚动，无嵌套滚动 */
 .object-list {
   list-style: none;
   margin: 0;
@@ -589,7 +584,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------------- 顶部居中风险告警条 ---------------- */
+/* 顶部居中风险告警条 */
 .risk-banner {
   position: absolute;
   top: 14px;
@@ -647,7 +642,7 @@ body {
   }
 }
 
-/* ---------------- 底部操作提示 ---------------- */
+/* 底部操作提示 */
 .hud-hint {
   left: 50%;
   bottom: 14px;
@@ -667,7 +662,7 @@ body {
   font-weight: 500;
 }
 
-/* ---------------- 点选对象信息卡（左下） ---------------- */
+/* 点选对象信息卡（左下） */
 .hud-info {
   left: 14px;
   bottom: 14px;
@@ -783,7 +778,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------------- 加载遮罩 ---------------- */
+/* 加载遮罩 */
 #loading {
   position: absolute;
   inset: 0;
@@ -842,7 +837,7 @@ body {
   word-break: break-all;
 }
 
-/* ---------------- 漫游：准星与暂停遮罩 ---------------- */
+/* 漫游：准星与暂停遮罩 */
 .crosshair {
   position: absolute;
   left: 50%;
@@ -889,7 +884,7 @@ body {
   cursor: pointer;
 }
 
-/* .roam-overlay 自己设了 display:flex，会盖掉 [hidden] 的 display:none，这里补回来 */
+/* .roam-overlay 设了 display:flex 会盖掉 [hidden] 的 display:none，这里补回来 */
 .roam-overlay[hidden] {
   display: none;
 }

@@ -1,10 +1,4 @@
-/**
- * 界面层
- *
- * 只管 DOM：右侧统一控制面板（视角切换 / 设备动画 / 风险模拟 / 场景对象）、
- * 顶部风险告警条、点选信息卡、准星、漫游暂停遮罩、操作提示。
- * 不碰任何三维逻辑，三维那边通过回调驱动它刷新。
- */
+// 界面层：只负责 DOM 面板和提示，三维那边通过回调驱动刷新
 export class Hud {
   constructor() {
     this.status = document.getElementById('hud-status')
@@ -41,7 +35,7 @@ export class Hud {
     this.measureButtons = document.getElementById('risk-measures')
     this.measureBtnMap = new Map()
 
-    // 人员（实时在场人数 / 分区分布 / 气温 / 风险状态）
+    // 人员面板
     this.peoplePanel = document.getElementById('people-panel')
     this.peopleTotal = document.getElementById('people-total')
     this.peopleSummary = document.getElementById('people-summary')
@@ -52,7 +46,7 @@ export class Hud {
     this.peopleNote = document.getElementById('people-note')
     this.btnPeopleVisible = document.getElementById('people-visible')
 
-    // 塔吊（回转 / 小车变幅 / 吊钩升降，三个动作各有速度倍率）
+    // 塔吊：回转 / 变幅 / 升降
     this.cranePanel = document.getElementById('crane-panel')
     this.btnCraneSlew = document.getElementById('crane-slew')
     this.craneTrolley = document.getElementById('crane-trolley')
@@ -76,19 +70,19 @@ export class Hud {
     // 恢复默认
     this.btnReset = document.getElementById('btn-reset')
 
-    // 大门（两扇蓝门对开，一个开关 + 一个开合速度）
+    // 大门
     this.gatePanel = document.getElementById('gate-panel')
     this.btnGate = document.getElementById('gate-toggle')
     this.gateSpeed = document.getElementById('gate-speed')
     this.gateSpeedValue = document.getElementById('gate-speed-value')
     this.gateStatus = document.getElementById('gate-status')
 
-    // 场景对象（可折叠）
+    // 场景对象
     this.objectBlock = document.getElementById('object-block')
     this.objectCount = document.getElementById('object-count')
     this.list = document.getElementById('object-list')
 
-    // 各分区标题可点击折叠（状态只记在本次会话）
+    // 分区折叠状态，只记在本次会话
     this.sectionMap = new Map()
     this.setupSections()
 
@@ -100,20 +94,11 @@ export class Hud {
     this.btnInfoClose = document.getElementById('info-close')
   }
 
-  // ------------------------------------------------------------------
-  // 顶部标题条
-  // ------------------------------------------------------------------
   setStatus(text) {
     this.status.textContent = text
   }
 
-  // ------------------------------------------------------------------
-  // 分区折叠（点击标题收起 / 展开；状态只记在本次会话）
-  // ------------------------------------------------------------------
-  /**
-   * 每个分区标题都是可点击的折叠开关。折叠状态用 DOM class 表示，
-   * 刷新页面即回到默认；「场景对象」在 HTML 里默认折叠，其余默认展开。
-   */
+  // 点标题收起 / 展开；「场景对象」默认折叠
   setupSections() {
     const sections = document.querySelectorAll('#side-panel .panel-section')
     for (const section of sections) {
@@ -128,7 +113,7 @@ export class Hud {
         head.setAttribute('aria-expanded', String(!collapsed))
       }
 
-      // 归一化初始状态：以正文的 is-collapsed 为准，同步标题箭头与 aria
+      // 以正文 class 为准，同步箭头与 aria
       setCollapsed(body.classList.contains('is-collapsed'))
       head.addEventListener('click', () => {
         setCollapsed(!body.classList.contains('is-collapsed'))
@@ -137,15 +122,11 @@ export class Hud {
     }
   }
 
-  /** 绑定「恢复默认」按钮 */
   bindResetDefaults(handler) {
     if (this.btnReset) this.btnReset.addEventListener('click', handler)
   }
 
-  // ------------------------------------------------------------------
-  // 场景对象（可折叠）
-  // ------------------------------------------------------------------
-  /** 按类型聚合统计场景对象 */
+  // 按 label 聚合计数
   renderObjectList(objects) {
     const counts = new Map()
     for (const obj of objects) {
@@ -159,10 +140,7 @@ export class Hud {
     if (this.objectCount) this.objectCount.textContent = String(objects.length)
   }
 
-  // ------------------------------------------------------------------
-  // 时间环境（4 个预设 + 时钟 / 温度状态行）
-  // ------------------------------------------------------------------
-  /** items: [{ key, label }]，点击回调收到 key */
+  // items: [{key,label}]，回调收到 key
   renderTimeButtons(items, handler) {
     this.timeButtons.innerHTML = ''
     this.timeBtnMap.clear()
@@ -178,15 +156,12 @@ export class Hud {
     }
   }
 
-  /** 高亮当前预设，并刷新时钟 / 温度状态行 */
+  // 高亮当前预设，刷新状态行
   setTimeState(activeKey, text) {
     for (const [k, btn] of this.timeBtnMap) btn.classList.toggle('is-active', k === activeKey)
     if (this.timeStatus) this.timeStatus.textContent = text
   }
 
-  // ------------------------------------------------------------------
-  // 车辆灯光（总开关）
-  // ------------------------------------------------------------------
   bindVehicleLights(handler) {
     this.btnVehicleLights.addEventListener('click', handler)
   }
@@ -197,10 +172,7 @@ export class Hud {
     this.btnVehicleLights.setAttribute('aria-pressed', String(active))
   }
 
-  // ------------------------------------------------------------------
-  // 视角切换
-  // ------------------------------------------------------------------
-  /** items: [{ key, label }]，点击回调收到 key */
+  // items: [{key,label}]，回调收到 key
   renderViewButtons(items, handler) {
     this.viewButtons.innerHTML = ''
     this.viewBtnMap.clear()
@@ -220,13 +192,7 @@ export class Hud {
     for (const [k, btn] of this.viewBtnMap) btn.classList.toggle('is-active', k === key)
   }
 
-  // ------------------------------------------------------------------
-  // 俯瞰 / 漫游 模式切换
-  // ------------------------------------------------------------------
-  /**
-   * 刷新模式相关的界面。
-   * 漫游模式下鼠标被锁定才显示准星；没锁定就说明被 Esc 打断了，弹出继续提示。
-   */
+  // 漫游且鼠标锁定时才显示准星；被 Esc 解锁后弹暂停提示
   setMode(mode, locked = false) {
     const roaming = mode === 'roam'
 
@@ -245,14 +211,8 @@ export class Hud {
     this.btnRoam.addEventListener('click', () => handler('roam'))
   }
 
-  // ------------------------------------------------------------------
-  // 设备动画（每台机械一个开关 + 一个速度倍率，可多台同时动作）
-  // ------------------------------------------------------------------
-  /**
-   * items: [{ key, label, short, running, speed }]
-   * handlers: { onToggle(key), onSpeed(key, value) }
-   * 每台机械占一行：上面是启停按钮，下面一行是它自己的速度滑块。
-   */
+  // items: [{key,label,short,running,speed}]
+  // handlers: { onToggle(key), onSpeed(key, value) }
   buildAnimButtons(items, handlers) {
     this.animButtons.innerHTML = ''
     this.animBtnMap.clear()
@@ -272,7 +232,7 @@ export class Hud {
       btn.addEventListener('click', () => handlers.onToggle(item.key))
       block.appendChild(btn)
 
-      // 速度控制：沿用塔吊面板一行的样式（标签 + 滑块 + 数值），不另造外观
+      // 复用塔吊行的样式（标签 + 滑块 + 数值）
       const row = document.createElement('div')
       row.className = 'crane-row'
 
@@ -312,7 +272,6 @@ export class Hud {
     this.setAnimState(items)
   }
 
-  /** 回写每台机械的运行状态与速度（按钮高亮 + 滑块位置 + 数值） */
   setAnimState(items) {
     for (const item of items) {
       const btn = this.animBtnMap.get(item.key)
@@ -325,12 +284,7 @@ export class Hud {
     }
   }
 
-  // ------------------------------------------------------------------
-  // 塔吊（回转 / 小车变幅 / 吊钩升降，三个动作各有速度倍率）
-  // ------------------------------------------------------------------
-  /**
-   * handlers: { onSlew, onTrolley(r), onHoist(ropeLen), onTrolleyAuto, onHoistAuto, onSpeed(key, v) }
-   */
+  // handlers: { onSlew, onTrolley, onHoist, onTrolleyAuto, onHoistAuto, onSpeed }
   bindCrane(handlers) {
     this.btnCraneSlew.addEventListener('click', handlers.onSlew)
     this.craneTrolley.addEventListener('input', (e) => handlers.onTrolley(Number(e.target.value)))
@@ -343,25 +297,24 @@ export class Hud {
     }
   }
 
-  /** 绳长滑块的量程（m），由三维侧的真实上下限决定 */
+  // 绳长量程 (m)，由三维侧传入
   setCraneRange(min, max) {
     this.craneHoist.min = String(min)
     this.craneHoist.max = String(max)
   }
 
-  /** 小车幅度滑块的量程（m）：内侧固定 2.5，外侧取大臂臂尖 */
+  // 幅度量程 (m)：内侧 2.5，外侧到大臂臂尖
   setTrolleyRange(min, max) {
     this.craneTrolley.min = String(min)
     this.craneTrolley.max = String(max)
   }
 
-  /** 刷新塔吊面板（回转 / 小车 / 升降 / 三个速度倍率 / 状态行） */
   setCraneState(s) {
     this.btnCraneSlew.textContent = s.slewOn ? '塔吊回转：开' : '塔吊回转：停'
     this.btnCraneSlew.classList.toggle('is-active', s.slewOn)
     this.btnCraneSlew.setAttribute('aria-pressed', String(s.slewOn))
 
-    // 拖动滑块时不要被回写打断
+    // 拖滑块时不要被回写打断
     if (document.activeElement !== this.craneTrolley) {
       this.craneTrolley.value = String(Number(s.trolleyR.toFixed(1)))
     }
@@ -377,7 +330,7 @@ export class Hud {
     this.btnCraneAuto.classList.toggle('is-active', !!s.hoistAuto)
     this.btnCraneAuto.setAttribute('aria-pressed', String(!!s.hoistAuto))
 
-    // 三个动作的速度倍率
+    // 速度倍率
     if (s.mul) {
       for (const key of ['slew', 'trolley', 'hoist']) {
         const el = this.craneSpeed[key]
@@ -393,7 +346,7 @@ export class Hud {
       `　吊钩离地 ${s.hookHeight.toFixed(1)} m`
   }
 
-  /** 节点缺失时禁用整个塔吊分区，只提示一次 */
+  // 节点缺失时禁用整个分区
   disableCrane(reason) {
     this.cranePanel.classList.add('is-disabled')
     const disabled = [
@@ -407,16 +360,12 @@ export class Hud {
     this.craneStatus.textContent = reason || '塔吊动画不可用'
   }
 
-  // ------------------------------------------------------------------
-  // 大门（两扇蓝门对开：开 / 关 + 开合速度）
-  // ------------------------------------------------------------------
-  /** handlers: { onToggle, onSpeed(v) } */
+  // handlers: { onToggle, onSpeed }
   bindGate(handlers) {
     this.btnGate.addEventListener('click', handlers.onToggle)
     this.gateSpeed.addEventListener('input', () => handlers.onSpeed(Number(this.gateSpeed.value)))
   }
 
-  /** 刷新大门面板（按钮文案 / 速度滑块 / 当前开合角度） */
   setGateState(s) {
     this.btnGate.textContent = s.open ? '大门：打开' : '大门：关闭'
     this.btnGate.classList.toggle('is-active', s.open)
@@ -429,7 +378,7 @@ export class Hud {
       `左扇 / 右扇 ${s.deg.toFixed(1)}° / ${s.deg.toFixed(1)}°　最大 ${s.maxDeg}°`
   }
 
-  /** 节点缺失时禁用整个大门分区，只提示一次 */
+  // 节点缺失时禁用
   disableGate(reason) {
     this.gatePanel.classList.add('is-disabled')
     if (this.btnGate) this.btnGate.disabled = true
@@ -437,10 +386,7 @@ export class Hud {
     this.gateStatus.textContent = reason || '大门动画不可用'
   }
 
-  // ------------------------------------------------------------------
-  // 风险模拟
-  // ------------------------------------------------------------------
-  /** items: [{ key, label, active }]，点击回调收到 key */
+  // items: [{key,label,active}]，回调收到 key
   renderRiskButtons(items, handler) {
     this.riskButtons.innerHTML = ''
     this.riskBtnMap.clear()
@@ -457,7 +403,7 @@ export class Hud {
     this.setRiskState(items)
   }
 
-  /** 高亮激活项，并同步顶部告警条 */
+  // 高亮激活项，同步顶部告警条
   setRiskState(items) {
     for (const item of items) {
       const btn = this.riskBtnMap.get(item.key)
@@ -481,7 +427,7 @@ export class Hud {
     this.btnRiskClear.addEventListener('click', handler)
   }
 
-  /** 处置措施按钮：items: [{ key, label, active }]，点击回调收到 key */
+  // 处置措施按钮，items 同上
   renderMeasureButtons(items, handler) {
     if (!this.measureButtons) return
     this.measureButtons.innerHTML = ''
@@ -506,10 +452,7 @@ export class Hud {
     }
   }
 
-  // ------------------------------------------------------------------
-  // 人员（实时在场人数 / 分区分部 / 气温 / 风险状态）
-  // ------------------------------------------------------------------
-  /** 让整个「人员」分区不可用（worker.glb 未就绪时） */
+  // worker.glb 没就绪时禁用整个人员分区
   disablePeople(reason) {
     if (!this.peoplePanel) return
     this.peoplePanel.classList.add('is-disabled')
@@ -522,15 +465,10 @@ export class Hud {
     if (this.btnPeopleVisible) this.btnPeopleVisible.disabled = true
   }
 
-  /** 绑定「人员显示」开关 */
   bindPeopleVisibility(handler) {
     if (this.btnPeopleVisible) this.btnPeopleVisible.addEventListener('click', handler)
   }
 
-  /**
-   * 回写「人员显示」开关状态。
-   * 按钮文案按「当前状态」显示：可见 → 「人员显示：显示」，隐藏 → 「人员显示：隐藏」。
-   */
   setPeopleVisible(visible) {
     if (!this.btnPeopleVisible) return
     this.btnPeopleVisible.textContent = visible ? '人员显示：显示' : '人员显示：隐藏'
@@ -538,11 +476,7 @@ export class Hud {
     this.btnPeopleVisible.setAttribute('aria-pressed', String(!!visible))
   }
 
-  /**
-   * 刷新人员面板。
-   * @param {object} stats People.getStats() 的返回值
-   * @param {object} info  { tempC, riskText, zoneTemps }（zoneTemps: 分区升温 °C）
-   */
+  // stats 来自 People.getStats()，info: { tempC, riskText, zoneTemps }
   updatePeople(stats, info = {}) {
     if (!this.peoplePanel || !stats) return
     const baseC = info.tempC ?? 0
@@ -554,19 +488,19 @@ export class Hud {
         `在场 ${stats.onSite} 人　疏散中 ${stats.evacuating} 人　安全区 ${stats.safe} 人`
     }
     if (this.peopleTemp) {
-      // 有火场时气温上浮：取受影响分区最大升温，反映「热浪」
+      // 有火场时气温上浮，取受影响分区最大升温
       const maxHeat = Math.max(0, ...Object.values(zoneTemps))
       this.peopleTemp.textContent = `${Math.round(baseC)} °C${maxHeat > 1 ? `　↑${Math.round(maxHeat)}` : ''}`
     }
     if (this.peopleRisk) this.peopleRisk.textContent = info.riskText || '当前无风险，工地运行正常'
 
-    // 人员构成（按模型统计，隐藏时也照常显示，反映真实编队）
+    // 人员构成，隐藏时也照常显示
     if (this.peopleModels && stats.models) {
       this.peopleModels.textContent =
         '人员构成　' +
         stats.models.filter((m) => m.count > 0).map((m) => `${m.label} ${m.count}`).join('　·　')
     }
-    // 隐藏时的说明：人数仍按逻辑状态统计
+    // 隐藏时仍按实际统计
     if (this.peopleNote) {
       this.peopleNote.textContent = stats.visible
         ? '隐藏仅影响显示，人数仍按实际状态统计'
@@ -584,14 +518,11 @@ export class Hud {
     }
   }
 
-  // ------------------------------------------------------------------
-  // 点选信息卡
-  // ------------------------------------------------------------------
   bindInfoClose(handler) {
     this.btnInfoClose.addEventListener('click', handler)
   }
 
-  /** info 为 null 时收起卡片 */
+  // info 为空就收起卡片
   showInfo(info) {
     if (!info) {
       this.hideInfo()
@@ -620,13 +551,13 @@ export class Hud {
     this.infoCard.hidden = true
   }
 
-  /** 点击暂停遮罩继续漫游（浏览器要求指针锁定必须由用户手势触发） */
+  // 点遮罩继续漫游；指针锁定必须由用户手势触发
   bindOverlayClick(handler) {
     this.overlay.addEventListener('click', handler)
   }
 }
 
-/** 速度倍率文案：1 → 「1.0×」 */
+// 1 显示成 "1.0×"
 function formatSpeed(v) {
   return `${Number(v).toFixed(1)}×`
 }

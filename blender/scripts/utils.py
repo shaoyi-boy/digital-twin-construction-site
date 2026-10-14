@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-"""建模工具集。核心是 MeshBuilder：把很多基础体合成一个网格，前端 draw call 少。
-
-全部用 bmesh 直接造几何，不走 bpy.ops，所以 --background 无界面模式也能跑。
+"""建模工具集：MeshBuilder 把大量基础体拼成一个网格，减少前端 draw call。
+全程走 bmesh、不用 bpy.ops，所以后台无界面模式也能跑。
 """
 
 import bpy
@@ -30,7 +29,7 @@ def get_collection(name="Site"):
 
 # bmesh 基础体
 def _create_cone(bm, segments, radius1, radius2, depth):
-    """不同 Blender 版本的圆锥参数名不一样，这里兼容一下。"""
+    """不同 Blender 版本圆锥参数名不一样，兼容一下。"""
     try:
         bmesh.ops.create_cone(
             bm, cap_ends=True, cap_tris=False, segments=segments,
@@ -61,9 +60,8 @@ class MeshBuilder(object):
         self.bm = bmesh.new()
         self.materials = []          # 材质槽顺序
         self._mat_index = {}         # 材质名 -> 槽位
-        self._face_cursor = 0        # 已合并的面数，用来给新面标材质
+        self._face_cursor = 0        # 已合并面数，给新面标材质
 
-    # 内部
     def _slot(self, mat_name):
         if mat_name not in self._mat_index:
             self._mat_index[mat_name] = len(self.materials)
@@ -86,7 +84,6 @@ class MeshBuilder(object):
             self.bm.faces[i].material_index = idx
         self._face_cursor += count
 
-    # 对外接口
     def box(self, size, location=(0, 0, 0), rotation=(0, 0, 0), mat="concrete"):
         """长方体。size = (x, y, z) 实际尺寸。"""
         tmp = bmesh.new()
@@ -144,7 +141,6 @@ class MeshBuilder(object):
         bmesh.ops.transform(tmp, matrix=_mat4(location, rotation), verts=tmp.verts)
         self._merge(tmp, mat)
 
-    # 生成物体
     def build(self, collection=None):
         mesh = bpy.data.meshes.new(self.name)
         self.bm.normal_update()
@@ -174,7 +170,7 @@ def export_glb(filepath, **overrides):
         "export_format": "GLB",
         "use_selection": False,
         "export_apply": True,          # 应用修改器
-        "export_yup": True,            # Z-up -> Y-up，符合 three.js 习惯
+        "export_yup": True,            # Z-up 转 Y-up，符合 three.js 习惯
         "export_materials": "EXPORT",
         "export_cameras": False,
         "export_lights": False,
@@ -193,9 +189,8 @@ def save_blend(filepath):
 
 
 def parent_to(child, parent):
-    """挂到父节点下，location/rotation 变成相对父级的局部变换。
-
-    关节动画模型靠这个分层导出，前端直接转对应节点就行。
+    """挂到父节点下，location / rotation 变成相对父级的局部变换。
+    关节动画靠这个分层导出，前端直接转对应的节点就行。
     """
     child.parent = parent
     child.matrix_parent_inverse = Matrix.Identity(4)
@@ -214,7 +209,7 @@ def make_object(builder, name, collection, location=(0, 0, 0), rotation=(0, 0, 0
 
 
 def count_mesh_stats():
-    """统计场景顶点/面数，打印出来看量级。"""
+    """统计场景里的顶点数 / 面数。"""
     verts = 0
     faces = 0
     for obj in bpy.context.scene.objects:
